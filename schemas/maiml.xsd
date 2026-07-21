@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" 
+           xmlns="http://www.maiml.org/schemas"
+           targetNamespace="http://www.maiml.org/schemas"
+           elementFormDefault="qualified"
+           version="1.0">
+  <xs:annotation>
+    <xs:documentation>MaiML Schema Version 1.0.0</xs:documentation>
+  </xs:annotation>
+
+  <xs:import namespace="http://www.w3.org/2001/04/xmlenc#" schemaLocation="xenc-schema.xsd"/>
+  <xs:import namespace="http://www.w3.org/2000/09/xmldsig#" schemaLocation="xmldsig-core-schema.xsd"/>
+  <xs:include schemaLocation="maiml-simpleTypes.xsd" />
+  <xs:include schemaLocation="maiml-property.xsd" />
+  <xs:include schemaLocation="maiml-core.xsd" />
+  <xs:include schemaLocation="maiml-document.xsd" />
+  <xs:include schemaLocation="maiml-protocol.xsd" />
+  <xs:include schemaLocation="maiml-data.xsd" />
+  <xs:include schemaLocation="maiml-eventLog.xsd" />
+  <xs:element name="maiml" type="rootObjectType" />
+  <xs:complexType name="rootObjectType" abstract="true">
+    <xs:sequence>
+      <xs:element name="document" type="documentType" />
+    </xs:sequence>
+    <xs:attribute name="version" use="required" type="xs:string" fixed="1.0" />
+    <xs:attribute name="features" type="xs:string" />
+  </xs:complexType>
+  <xs:complexType name="maimlRootType">
+    <xs:complexContent>
+      <xs:extension base="rootObjectType">
+        <xs:sequence>
+          <xs:element name="protocol" type="protocolType" />
+          <xs:element name="data" type="dataType" />
+          <xs:element name="eventLog" type="eventLogType" />
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+  <xs:complexType name="protocolFileRootType">
+    <xs:complexContent>
+      <xs:extension base="rootObjectType">
+        <xs:sequence>
+          <xs:element name="protocol" type="protocolType" />
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+</xs:schema>

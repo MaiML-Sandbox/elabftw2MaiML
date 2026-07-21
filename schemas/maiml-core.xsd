@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema elementFormDefault="qualified"
+           xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns="http://www.maiml.org/schemas"
+           xmlns:xenc="http://www.w3.org/2001/04/xmlenc#"
+           xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
+           targetNamespace="http://www.maiml.org/schemas">
+    <xs:annotation>
+      <xs:documentation>MaiML Schema Version 1.0.0</xs:documentation>
+    </xs:annotation>
+
+    <xs:include schemaLocation="maiml-simpleTypes.xsd" />
+    <xs:include schemaLocation="maiml-property.xsd" />
+    <xs:import namespace="http://www.w3.org/2001/04/xmlenc#" schemaLocation="xenc-schema.xsd"/>
+    <xs:import namespace="http://www.w3.org/2000/09/xmldsig#" schemaLocation="xmldsig-core-schema.xsd"/>
+    
+    <xs:group name="globalObjectContentGroup">
+      <xs:sequence>
+        <xs:element name="uuid" type="uuid" />
+        <xs:choice>
+          <xs:group ref="encryptionGroup" />
+          <xs:sequence>
+            <xs:element name="insertion" type="insertionType" minOccurs="0" maxOccurs="unbounded" />
+            <xs:element name="name" type="xs:QName" minOccurs="0" />
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="annotation" type="xs:string" minOccurs="0" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+        </xs:choice>
+      </xs:sequence>
+    </xs:group>
+    
+    <xs:complexType abstract="true" name="hasIdAttributeType">
+        <xs:attribute name="id" type="xs:ID" use="required" />
+    </xs:complexType>
+    
+    <xs:complexType abstract="true" name="simpleObjectType">
+        <xs:sequence>
+            <xs:element name="name" type="xs:QName" minOccurs="0" />
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+        </xs:sequence>
+        <xs:attribute name="id" type="xs:ID" use="required" />
+    </xs:complexType>
+    <xs:complexType abstract="true" name="referenceObjectType">
+        <xs:complexContent>
+            <xs:extension base="simpleObjectType">
+                <xs:attribute name="ref" type="xs:IDREF" use="required" />
+            </xs:extension>
+        </xs:complexContent>
+    </xs:complexType>
+    <xs:complexType abstract="true" name="tripleObjectType">
+        <xs:complexContent>
+            <xs:extension base="simpleObjectType">
+                <xs:attribute name="source" type="xs:IDREF" use="required" />
+                <xs:attribute name="target" type="xs:IDREF" use="required" />
+            </xs:extension>
+        </xs:complexContent>
+    </xs:complexType>
+    
+    <xs:complexType name="insertionType">
+        <xs:sequence>
+            <xs:element name="uri" type="xs:anyURI" />
+            <xs:element name="hash" type="hashType" />
+            <xs:element name="uuid" type="uuid" minOccurs="0" />
+            <xs:element name="format" type="xs:string" minOccurs="0" />
+        </xs:sequence>
+    </xs:complexType>
+    
+  <xs:complexType name="hashType">
+    <xs:simpleContent>
+      <xs:extension base="xs:base64Binary">
+        <xs:attribute name="method" type="xs:string" />
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+
+</xs:schema>

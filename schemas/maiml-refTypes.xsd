@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified"
+           xmlns="http://www.maiml.org/schemas"
+           targetNamespace="http://www.maiml.org/schemas">
+  <xs:annotation>
+    <xs:documentation>MaiML Schema Version 1.0.0</xs:documentation>
+  </xs:annotation>
+
+  <xs:include schemaLocation="maiml-core.xsd" />
+
+  <xs:complexType name="creatorRefType">
+    <xs:complexContent>
+      <xs:extension base="referenceObjectType" />
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="vendorRefType">
+    <xs:complexContent>
+      <xs:extension base="referenceObjectType" />
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="ownerRefType">
+    <xs:complexContent>
+      <xs:extension base="referenceObjectType" />
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="instrumentRefType">
+    <xs:complexContent>
+      <xs:extension base="referenceObjectType" />
+    </xs:complexContent>
+  </xs:complexType>
+  
+  <xs:complexType name="placeRefType">
+    <xs:complexContent>
+      <xs:extension base="referenceObjectType">
+        <xs:attribute name="initialMarking" type="xs:boolean"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="transitionRefType">
+    <xs:complexContent>
+      <xs:extension base="referenceObjectType" />
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="resultsRefType">
+    <xs:complexContent>
+      <xs:extension base="referenceObjectType" />
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="templateRefType">
+    <xs:complexContent>
+      <xs:extension base="referenceObjectType" />
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="instanceRefType">
+    <xs:complexContent>
+      <xs:extension base="referenceObjectType" />
+    </xs:complexContent>
+  </xs:complexType>
+
+</xs:schema>

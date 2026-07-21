@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified"
+           xmlns="http://www.maiml.org/schemas"
+           targetNamespace="http://www.maiml.org/schemas">
+  <xs:annotation>
+    <xs:documentation>MaiML Schema Version 1.0.0</xs:documentation>
+  </xs:annotation>
+  
+  <xs:include schemaLocation="maiml-simpleTypes.xsd" />
+  <xs:include schemaLocation="maiml-property.xsd" />
+  <xs:include schemaLocation="maiml-core.xsd" />
+
+  <xs:complexType name="dataType">
+    <xs:complexContent>
+      <xs:extension base="hasIdAttributeType">
+        <xs:sequence>
+          <xs:group ref="globalObjectContentGroup" />
+          <xs:element name="results" maxOccurs="unbounded" type="resultsType" />
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="resultsType">
+    <xs:complexContent>
+      <xs:extension base="hasIdAttributeType">
+        <xs:sequence>
+          <xs:group ref="globalObjectContentGroup" />
+          <xs:element name="material" minOccurs="0" maxOccurs="unbounded" type="materialType" />
+          <xs:element name="condition" minOccurs="0" maxOccurs="unbounded" type="conditionType" />
+          <xs:element name="result" minOccurs="0" maxOccurs="unbounded" type="resultType" />
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+  
+  <xs:complexType name="materialType">
+    <xs:complexContent>
+      <xs:extension base="hasIdAttributeType">
+        <xs:sequence>
+          <xs:group ref="globalObjectContentGroup" />
+          <xs:element name="instanceRef" minOccurs="0" maxOccurs="unbounded" type="instanceRefType" />
+        </xs:sequence>
+        <xs:attribute name="ref" use="required" type="xs:IDREF" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="conditionType">
+    <xs:complexContent>
+      <xs:extension base="hasIdAttributeType">
+        <xs:sequence>
+          <xs:group ref="globalObjectContentGroup" />
+          <xs:element name="instanceRef" minOccurs="0" maxOccurs="unbounded" type="instanceRefType" />
+        </xs:sequence>
+        <xs:attribute name="ref" use="required" type="xs:IDREF" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="resultType">
+    <xs:complexContent>
+      <xs:extension base="hasIdAttributeType">
+        <xs:sequence>
+          <xs:group ref="globalObjectContentGroup" />
+          <xs:element name="instanceRef" minOccurs="0" maxOccurs="unbounded" type="instanceRefType" />
+        </xs:sequence>
+        <xs:attribute name="ref" use="required" type="xs:IDREF" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+</xs:schema>

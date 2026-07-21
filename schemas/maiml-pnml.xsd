@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified"
+           xmlns="http://www.maiml.org/schemas"
+           targetNamespace="http://www.maiml.org/schemas">
+  <xs:annotation>
+    <xs:documentation>MaiML Schema Version 1.0.0</xs:documentation>
+  </xs:annotation>
+
+  <xs:include schemaLocation="maiml-simpleTypes.xsd" />
+  <xs:include schemaLocation="maiml-refTypes.xsd" />
+  <xs:include schemaLocation="maiml-property.xsd" />
+  <xs:include schemaLocation="maiml-core.xsd" />
+  <xs:complexType name="pnmlType">
+    <xs:complexContent>
+      <xs:extension base="hasIdAttributeType">
+        <xs:sequence>
+          <xs:group ref="globalObjectContentGroup" />
+          <xs:element name="place" maxOccurs="unbounded" type="placeType" />
+          <xs:element name="transition" maxOccurs="unbounded" type="transitionType" />
+          <xs:element name="arc" maxOccurs="unbounded" type="arcType" />
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+  <xs:complexType name="placeType">
+    <xs:complexContent>
+      <xs:extension base="simpleObjectType" />
+    </xs:complexContent>
+  </xs:complexType>
+  <xs:complexType name="transitionType">
+    <xs:complexContent>
+      <xs:extension base="simpleObjectType" />
+    </xs:complexContent>
+  </xs:complexType>
+  <xs:complexType name="arcType">
+    <xs:complexContent>
+      <xs:extension base="tripleObjectType" />
+    </xs:complexContent>
+  </xs:complexType>
+</xs:schema>

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified"
+           xmlns="http://www.maiml.org/schemas"
+           targetNamespace="http://www.maiml.org/schemas">
+  <xs:annotation>
+    <xs:documentation>MaiML Schema Version 1.0.0</xs:documentation>
+  </xs:annotation>
+
+  <xs:include schemaLocation="maiml-simpleTypes.xsd" />
+  <xs:include schemaLocation="maiml-property.xsd" />
+  <xs:include schemaLocation="maiml-core.xsd" />
+  <xs:include schemaLocation="maiml-document.xsd" />
+  <xs:include schemaLocation="maiml-protocol.xsd" />
+  <xs:include schemaLocation="maiml-data.xsd" />
+  <xs:include schemaLocation="maiml-eventLog.xsd" />
+  <xs:element name="document" type="documentType" />
+  <xs:element name="protocol" type="protocolType" />
+  <xs:element name="eventLog" type="eventLogType" />
+  <xs:element name="data" type="dataType" />
+  <xs:element name="creator" type="creatorType" />
+  <xs:element name="vendor" type="vendorType" />
+  <xs:element name="owner" type="ownerType" />
+  <xs:element name="instrument" type="instrumentType" />
+  <xs:element name="method" type="methodType" />
+  <xs:element name="program" type="programType" />
+  <xs:element name="instruction" type="instructionType" />
+  <xs:element name="materialTemplate" type="materialTemplateType" />
+  <xs:element name="conditionTemplate" type="conditionTemplateType" />
+  <xs:element name="resultTemplate" type="resultTemplateType" />
+  <xs:element name="results" type="resultsType" />
+  <xs:element name="material" type="materialType" />
+  <xs:element name="condition" type="conditionType" />
+  <xs:element name="result" type="resultType" />
+  <xs:element name="log" type="logType" />
+  <xs:element name="trace" type="traceType"/>
+  <xs:element name="event" type="eventType" />
+  <xs:element name="content" type="contentBaseType" />
+  <xs:element name="property" type="propertyBaseType" />
+  <xs:element name="uncertainty" type="propertyBaseType" />
+  <xs:element name="propertyHelper" type="propertyListType" />
+  <xs:element name="insertion" type="insertionType" />
+</xs:schema>

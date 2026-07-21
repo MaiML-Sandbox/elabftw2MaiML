@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified"
+           xmlns="http://www.maiml.org/schemas"
+           targetNamespace="http://www.maiml.org/schemas">
+  <xs:annotation>
+    <xs:documentation>MaiML Schema Version 1.0.0</xs:documentation>
+  </xs:annotation>
+
+  <xs:include schemaLocation="maiml-simpleTypes.xsd" />
+  <xs:include schemaLocation="maiml-refTypes.xsd" />
+  <xs:include schemaLocation="maiml-property.xsd" />
+  <xs:include schemaLocation="maiml-core.xsd" />
+
+  <xs:complexType name="eventLogType">
+    <xs:complexContent>
+      <xs:extension base="hasIdAttributeType">
+        <xs:sequence>
+          <xs:group ref="globalObjectContentGroup" />
+          <xs:element name="log" maxOccurs="unbounded" type="logType" />
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="logType">
+    <xs:complexContent>
+      <xs:extension base="hasIdAttributeType">
+        <xs:sequence>
+          <xs:group ref="globalObjectContentGroup" />
+          <xs:element name="extension" minOccurs="0" maxOccurs="unbounded" type="extensionType"/>
+          <xs:element name="global" minOccurs="0" maxOccurs="unbounded" type="globalsType"/>
+          <xs:element name="classifier" minOccurs="0" maxOccurs="unbounded" type="classifierType"/>
+          <xs:element name="trace" maxOccurs="unbounded" type="traceType"/>
+          <xs:element name="creatorRef" minOccurs="0" maxOccurs="unbounded" type="creatorRefType" />
+          <xs:element name="ownerRef" minOccurs="0" maxOccurs="unbounded" type="ownerRefType" />
+        </xs:sequence>
+        <xs:attribute name="ref" use="required" type="xs:IDREF" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+  
+  <xs:complexType name="traceType">
+    <xs:complexContent>
+      <xs:extension base="hasIdAttributeType">
+        <xs:sequence>
+          <xs:group ref="globalObjectContentGroup" />
+          <xs:element name="event" maxOccurs="unbounded" type="eventType" />
+          <xs:element name="creatorRef" minOccurs="0" maxOccurs="unbounded" type="creatorRefType" />
+          <xs:element name="ownerRef" minOccurs="0" maxOccurs="unbounded" type="ownerRefType" />
+        </xs:sequence>
+        <xs:attribute name="ref" use="required" type="xs:IDREF" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+  
+  <xs:complexType name="eventType">
+    <xs:complexContent>
+      <xs:extension base="hasIdAttributeType">
+        <xs:sequence>
+          <xs:group ref="globalObjectContentGroup" />
+          <xs:element name="resultsRef" minOccurs="0" maxOccurs="unbounded" type="resultsRefType" />
+          <xs:element name="creatorRef" minOccurs="0" maxOccurs="unbounded" type="creatorRefType" />
+          <xs:element name="ownerRef" minOccurs="0" maxOccurs="unbounded" type="ownerRefType" />
+        </xs:sequence>
+        <xs:attribute name="ref" use="required" type="xs:IDREF" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="extensionType">
+    <xs:attribute name="name" use="required" type="xs:NCName"/>
+    <xs:attribute name="prefix" use="required" type="xs:NCName"/>
+    <xs:attribute name="uri" use="required" type="xs:anyURI"/>
+  </xs:complexType>
+
+  <xs:complexType name="globalsType">
+    <xs:complexContent>
+      <xs:extension base="AttributableType">
+        <xs:attribute name="scope" type="xs:NCName" use="required"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="classifierType">
+    <xs:attribute name="name" type="xs:NCName" use="required"/>
+    <xs:attribute name="scope" type="xs:NCName" use="required"/>
+    <xs:attribute name="keys" type="xs:token" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="AttributableType" abstract="true">
+    <xs:sequence>
+      <xs:element name="property" minOccurs="0" maxOccurs="unbounded" type="propertyBaseType" />
+    </xs:sequence>
+  </xs:complexType>
+
+</xs:schema>
+

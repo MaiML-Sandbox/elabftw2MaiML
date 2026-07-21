@@ -1,0 +1,1325 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified"
+  xmlns:xenc="http://www.w3.org/2001/04/xmlenc#"
+  xmlns="http://www.maiml.org/schemas" targetNamespace="http://www.maiml.org/schemas">
+  <xs:annotation>
+    <xs:documentation>MaiML Schema Version 1.0.0</xs:documentation>
+  </xs:annotation>
+
+  <xs:include schemaLocation="maiml-simpleTypes.xsd" />
+  <xs:import namespace="http://www.w3.org/2001/04/xmlenc#" schemaLocation="xenc-schema.xsd"/>
+
+  <xs:group name="genericDataContainerGroup">
+    <xs:sequence>
+      <xs:element name="property" minOccurs="0" maxOccurs="unbounded" type="propertyBaseType" />
+      <xs:element name="content" minOccurs="0" maxOccurs="unbounded" type="contentBaseType" />
+    </xs:sequence>
+  </xs:group>
+
+  <xs:group name="encryptionGroup">
+    <xs:sequence>
+      <xs:element name="childUri" type="xs:anyURI" minOccurs="0" maxOccurs="unbounded" />
+      <xs:element name="childHash" type="xs:base64Binary" minOccurs="0" maxOccurs="unbounded" />
+      <xs:element name="childUuid" type="uuid" minOccurs="0" maxOccurs="unbounded" />
+      <xs:element ref="xenc:EncryptedData" />
+    </xs:sequence>
+  </xs:group>
+
+  <!-- ============================================================== -->
+  <!-- uncertaintyの型(propertyBase/contentBaseをここから派生)         -->
+  <!-- ============================================================== -->
+  <xs:complexType name="uncertaintyBaseType" abstract="true">
+    <xs:attribute name="key" use="required" type="xs:QName" />
+  </xs:complexType>
+
+  <!-- ======================= -->
+  <!-- property (base)         -->
+  <!-- ======================= -->
+  <xs:complexType name="propertyBaseType" abstract="true">
+    <xs:complexContent>
+      <xs:extension base="uncertaintyBaseType" />
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- ======================= -->
+  <!-- property (simple types) -->
+  <!-- ======================= -->
+  <!-- string -->
+  <xs:complexType name="stringType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="xs:string" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- token -->
+  <xs:complexType name="tokenType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="xs:token" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- id -->
+  <xs:complexType name="idType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="xs:ID" nillable="true" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- idRef -->
+  <xs:complexType name="idRefType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="xs:IDREF" nillable="true" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- qualifiedName -->
+  <xs:complexType name="qualifiedNameType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="xs:QName" nillable="true" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- dateTime -->
+  <xs:complexType name="dateTimeType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="xs:dateTime" nillable="true" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="dateTimeFormatStringType" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- decimal -->
+  <xs:complexType name="decimalType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="xs:decimal" nillable="true" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="decimalFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- double -->
+  <xs:complexType name="doubleType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="xs:double" nillable="true" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="floatFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- float -->
+  <xs:complexType name="floatType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="xs:float" nillable="true" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="floatFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- int -->
+  <xs:complexType name="intType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="xs:int" nillable="true" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- long -->
+  <xs:complexType name="longType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="xs:long" nillable="true" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- short -->
+  <xs:complexType name="shortType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="xs:short" nillable="true" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- byte -->
+  <xs:complexType name="byteType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="xs:byte" nillable="true" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- unsignedInt -->
+  <xs:complexType name="unsignedIntType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="xs:unsignedInt" nillable="true" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- unsignedLong -->
+  <xs:complexType name="unsignedLongType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="xs:unsignedLong" nillable="true" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- unsignedShort -->
+  <xs:complexType name="unsignedShortType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="xs:unsignedShort" nillable="true" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- unsignedByte -->
+  <xs:complexType name="unsignedByteType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="xs:unsignedByte" nillable="true" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- boolean -->
+  <xs:complexType name="booleanType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="xs:boolean" nillable="true" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- base64Binary -->
+  <xs:complexType name="base64BinaryType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="xs:base64Binary" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- hexBinary -->
+  <xs:complexType name="hexBinaryType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="xs:hexBinary" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- uri -->
+  <xs:complexType name="uriType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="xs:anyURI" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- uuid -->
+  <xs:complexType name="uuidType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="uuid" nillable="true" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- language -->
+  <xs:complexType name="languageType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" type="xs:language" nillable="true" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- ======================= -->
+  <!-- property (list types)   -->
+  <!-- ======================= -->
+  <!-- propertyList -->
+  <xs:complexType name="propertyListType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- stringList -->
+  <xs:complexType name="stringListType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="stringList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- idRefList -->
+  <xs:complexType name="idRefListType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="idRefList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- qualifiedNameList -->
+  <xs:complexType name="qualifiedNameListType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="qualifiedNameList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- dateTimeList -->
+  <xs:complexType name="dateTimeListType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="dateTimeList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="dateTimeFormatStringType" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- decimalList  -->
+  <xs:complexType name="decimalListType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="decimalList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="decimalFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- doubleList  -->
+  <xs:complexType name="doubleListType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="doubleList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="floatFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- floatList  -->
+  <xs:complexType name="floatListType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="floatList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="floatFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- intList  -->
+  <xs:complexType name="intListType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="intList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- longList  -->
+  <xs:complexType name="longListType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="longList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- shortList  -->
+  <xs:complexType name="shortListType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="shortList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- byteList  -->
+  <xs:complexType name="byteListType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="byteList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- unsignedIntList  -->
+  <xs:complexType name="unsignedIntListType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="unsignedIntList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- unsignedLongList  -->
+  <xs:complexType name="unsignedLongListType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="unsignedLongList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- unsignedShortList  -->
+  <xs:complexType name="unsignedShortListType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="unsignedShortList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- unsignedByteList  -->
+  <xs:complexType name="unsignedByteListType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="unsignedByteList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- booleanList -->
+  <xs:complexType name="booleanListType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="booleanList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- base64BinaryList -->
+  <xs:complexType name="base64BinaryListType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="base64BinaryList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- hexBinaryList -->
+  <xs:complexType name="hexBinaryListType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="hexBinaryList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- uriList -->
+  <xs:complexType name="uriListType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="uriList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- uuidList -->
+  <xs:complexType name="uuidListType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="uuidList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- languageList -->
+  <xs:complexType name="languageListType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="languageList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- stringEnum -->
+  <xs:complexType name="stringEnumType">
+    <xs:complexContent>
+      <xs:extension base="propertyBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="xs:string" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+
+  <!-- ======================= -->
+  <!-- content (base)          -->
+  <!-- ======================= -->
+  <xs:complexType name="contentBaseType" abstract="true">
+    <xs:complexContent>
+      <xs:extension base="uncertaintyBaseType">
+        <xs:attribute name="axis" type="xs:string" />
+        <xs:attribute name="size" type="xs:int" />
+        <xs:attribute name="id" type="xs:ID" />
+        <xs:attribute name="ref" type="xs:IDREF" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- ======================= -->
+  <!-- content (list types)    -->
+  <!-- ======================= -->
+  <!-- stringList -->
+  <xs:complexType name="contentStringListType">
+    <xs:complexContent>
+      <xs:extension base="contentBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="stringList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- idRefList -->
+  <xs:complexType name="contentIdRefListType">
+    <xs:complexContent>
+      <xs:extension base="contentBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="idRefList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- qualifiedNameList -->
+  <xs:complexType name="contentQualifiedNameListType">
+    <xs:complexContent>
+      <xs:extension base="contentBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="qualifiedNameList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- dateTimeList -->
+  <xs:complexType name="contentDateTimeListType">
+    <xs:complexContent>
+      <xs:extension base="contentBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="dateTimeList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="dateTimeFormatStringType" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- decimalList  -->
+  <xs:complexType name="contentDecimalListType">
+    <xs:complexContent>
+      <xs:extension base="contentBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="decimalList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="decimalFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- doubleList  -->
+  <xs:complexType name="contentDoubleListType">
+    <xs:complexContent>
+      <xs:extension base="contentBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="doubleList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="floatFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+   <!-- floatList  -->
+  <xs:complexType name="contentFloatListType">
+    <xs:complexContent>
+      <xs:extension base="contentBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="floatList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="floatFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- intList  -->
+  <xs:complexType name="contentIntListType">
+    <xs:complexContent>
+      <xs:extension base="contentBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="intList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- longList  -->
+  <xs:complexType name="contentLongListType">
+    <xs:complexContent>
+      <xs:extension base="contentBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="longList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- shortList  -->
+  <xs:complexType name="contentShortListType">
+    <xs:complexContent>
+      <xs:extension base="contentBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="shortList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- byteList  -->
+  <xs:complexType name="contentByteListType">
+    <xs:complexContent>
+      <xs:extension base="contentBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="byteList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- unsignedIntList  -->
+  <xs:complexType name="contentUnsignedIntListType">
+    <xs:complexContent>
+      <xs:extension base="contentBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="unsignedIntList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- unsignedLongList  -->
+  <xs:complexType name="contentUnsignedLongListType">
+    <xs:complexContent>
+      <xs:extension base="contentBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="unsignedLongList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- unsignedShortList  -->
+  <xs:complexType name="contentUnsignedShortListType">
+    <xs:complexContent>
+      <xs:extension base="contentBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="unsignedShortList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- unsignedByteList  -->
+  <xs:complexType name="contentUnsignedByteListType">
+    <xs:complexContent>
+      <xs:extension base="contentBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="unsignedByteList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+        <xs:attribute name="formatString" type="integerFormatStringType" />
+        <xs:attribute name="units" type="xs:string" />
+        <xs:attribute name="scaleFactor" type="xs:double" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- booleanList -->
+  <xs:complexType name="contentBooleanListType">
+    <xs:complexContent>
+      <xs:extension base="contentBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="booleanList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- base64BinaryList -->
+  <xs:complexType name="contentBase64BinaryListType">
+    <xs:complexContent>
+      <xs:extension base="contentBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="base64BinaryList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- hexBinaryList -->
+  <xs:complexType name="contentHexBinaryListType">
+    <xs:complexContent>
+      <xs:extension base="contentBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="hexBinaryList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- uriList -->
+  <xs:complexType name="contentUriListType">
+    <xs:complexContent>
+      <xs:extension base="contentBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="uriList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- uuidList -->
+  <xs:complexType name="contentUuidListType">
+    <xs:complexContent>
+      <xs:extension base="contentBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="uuidList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- languageList -->
+  <xs:complexType name="contentLanguageListType">
+    <xs:complexContent>
+      <xs:extension base="contentBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="languageList" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- stringEnum -->
+  <xs:complexType name="contentStringEnumType">
+    <xs:complexContent>
+      <xs:extension base="contentBaseType">
+        <xs:choice>
+          <xs:sequence>
+            <xs:element name="description" type="xs:string" minOccurs="0" />
+            <xs:element name="value" minOccurs="0" maxOccurs="unbounded" type="xs:string" />
+            <xs:element name="uncertainty" minOccurs="0" maxOccurs="unbounded" type="uncertaintyBaseType" />
+            <xs:group ref="genericDataContainerGroup" />
+          </xs:sequence>
+          <xs:group ref="encryptionGroup" />
+        </xs:choice>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+</xs:schema>

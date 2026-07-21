@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified"
+           xmlns="http://www.maiml.org/schemas"
+           targetNamespace="http://www.maiml.org/schemas">
+  <xs:annotation>
+    <xs:documentation>MaiML Schema Version 1.0.0</xs:documentation>
+  </xs:annotation>
+
+  <xs:include schemaLocation="maiml-simpleTypes.xsd" />
+  <xs:include schemaLocation="maiml-property.xsd" />
+  <xs:include schemaLocation="maiml-core.xsd" />
+  <xs:include schemaLocation="maiml-pnml.xsd" />
+
+  <xs:complexType name="protocolType">
+    <xs:complexContent>
+      <xs:extension base="hasIdAttributeType">
+        <xs:sequence>
+          <xs:group ref="globalObjectContentGroup" />
+          <xs:element name="method" maxOccurs="unbounded" type="methodType" />
+          <xs:element name="materialTemplate" minOccurs="0" maxOccurs="unbounded" type="materialTemplateType" />
+          <xs:element name="conditionTemplate" minOccurs="0" maxOccurs="unbounded" type="conditionTemplateType" />
+          <xs:element name="resultTemplate" minOccurs="0" maxOccurs="unbounded" type="resultTemplateType" />
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="methodType">
+    <xs:complexContent>
+      <xs:extension base="hasIdAttributeType">
+        <xs:sequence>
+          <xs:group ref="globalObjectContentGroup" />
+          <xs:element name="pnml" maxOccurs="unbounded" type="pnmlType" />
+          <xs:element name="program" maxOccurs="unbounded" type="programType" />
+          <xs:element name="materialTemplate" minOccurs="0" maxOccurs="unbounded" type="materialTemplateType" />
+          <xs:element name="conditionTemplate" minOccurs="0" maxOccurs="unbounded" type="conditionTemplateType" />
+          <xs:element name="resultTemplate" minOccurs="0" maxOccurs="unbounded" type="resultTemplateType" />
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="programType">
+    <xs:complexContent>
+      <xs:extension base="hasIdAttributeType">
+        <xs:sequence>
+          <xs:group ref="globalObjectContentGroup" />
+          <xs:element name="instruction" maxOccurs="unbounded" type="instructionType" />
+          <xs:element name="materialTemplate" minOccurs="0" maxOccurs="unbounded" type="materialTemplateType" />
+          <xs:element name="conditionTemplate" minOccurs="0" maxOccurs="unbounded" type="conditionTemplateType" />
+          <xs:element name="resultTemplate" minOccurs="0" maxOccurs="unbounded" type="resultTemplateType" />
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="instructionType">
+    <xs:complexContent>
+      <xs:extension base="hasIdAttributeType">
+        <xs:sequence>
+          <xs:group ref="globalObjectContentGroup" />
+          <xs:element name="transitionRef" maxOccurs="unbounded" type="transitionRefType" />
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+  
+  <xs:complexType name="materialTemplateType">
+    <xs:complexContent>
+      <xs:extension base="hasIdAttributeType">
+        <xs:sequence>
+          <xs:group ref="globalObjectContentGroup" />
+          <xs:element name="placeRef" maxOccurs="unbounded" type="placeRefType" />
+          <xs:element name="templateRef" minOccurs="0" maxOccurs="unbounded" type="templateRefType" />
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+  
+  <xs:complexType name="conditionTemplateType">
+    <xs:complexContent>
+      <xs:extension base="hasIdAttributeType">
+        <xs:sequence>
+          <xs:group ref="globalObjectContentGroup" />
+          <xs:element name="placeRef" maxOccurs="unbounded" type="placeRefType" />
+          <xs:element name="templateRef" minOccurs="0" maxOccurs="unbounded" type="templateRefType" />
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="resultTemplateType">
+    <xs:complexContent>
+      <xs:extension base="hasIdAttributeType">
+        <xs:sequence>
+          <xs:group ref="globalObjectContentGroup" />
+          <xs:element name="placeRef" maxOccurs="unbounded" type="placeRefType" />
+          <xs:element name="templateRef" minOccurs="0" maxOccurs="unbounded" type="templateRefType" />
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+</xs:schema>

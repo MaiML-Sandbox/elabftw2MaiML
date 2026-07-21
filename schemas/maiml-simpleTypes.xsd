@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified"
+           xmlns="http://www.maiml.org/schemas"
+           targetNamespace="http://www.maiml.org/schemas">
+  <xs:annotation>
+    <xs:documentation>MaiML Schema Version 1.0.0</xs:documentation>
+  </xs:annotation>
+
+  <xs:simpleType name="uuid">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[3-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="isoLanguageName">
+    <xs:restriction base="xs:language">
+      <xs:pattern value="[a-zA-Z]{2,3}"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="decimalFormatStringType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="0(\.0+)?"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="floatFormatStringType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="0(\.0+)?((E|e)0+)?"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="integerFormatStringType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="0"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="dateTimeFormatStringType">
+    <xs:annotation>
+      <xs:documentation>https://www.w3.org/TR/NOTE-datetime</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:pattern value="YYYY-MM-DDThh:mm:ss(\.s+)?(TZD)?"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="stringList">
+    <xs:list itemType="xs:string" />
+  </xs:simpleType>
+  <xs:simpleType name="uuidList">
+    <xs:list itemType="uuid" />
+  </xs:simpleType>
+  <xs:simpleType name="isoLanguageNameList">
+    <xs:list itemType="isoLanguageName" />
+  </xs:simpleType>
+  <xs:simpleType name="languageList">
+    <xs:list itemType="xs:language" />
+  </xs:simpleType>
+  <xs:simpleType name="nameTokenList">
+    <xs:restriction base="xs:NMTOKENS" />
+  </xs:simpleType>
+  <xs:simpleType name="nameList">
+    <xs:list itemType="xs:Name" />
+  </xs:simpleType>
+  <xs:simpleType name="localNameList">
+    <xs:list itemType="xs:NCName" />
+  </xs:simpleType>
+  <xs:simpleType name="idRefList">
+    <xs:list itemType="xs:IDREF" />
+  </xs:simpleType>
+  <xs:simpleType name="qualifiedNameList">
+    <xs:list itemType="xs:QName" />
+  </xs:simpleType>
+  <xs:simpleType name="uriList">
+    <xs:list itemType="xs:anyURI" />
+  </xs:simpleType>
+  <xs:simpleType name="hexBinaryList">
+    <xs:list itemType="xs:hexBinary" />
+  </xs:simpleType>
+  <xs:simpleType name="base64BinaryList">
+    <xs:list itemType="xs:base64Binary" />
+  </xs:simpleType>
+  <xs:simpleType name="dateTimeList">
+    <xs:list itemType="xs:dateTime" />
+  </xs:simpleType>
+  <xs:simpleType name="booleanList">
+    <xs:list itemType="xs:boolean" />
+  </xs:simpleType>
+  <xs:simpleType name="decimalList">
+    <xs:list itemType="xs:decimal" />
+  </xs:simpleType>
+  <xs:simpleType name="doubleList">
+    <xs:list itemType="xs:double" />
+  </xs:simpleType>
+  <xs:simpleType name="floatList">
+    <xs:list itemType="xs:float" />
+  </xs:simpleType>
+  <xs:simpleType name="longList">
+    <xs:list itemType="xs:long" />
+  </xs:simpleType>
+  <xs:simpleType name="intList">
+    <xs:list itemType="xs:int" />
+  </xs:simpleType>
+  <xs:simpleType name="shortList">
+    <xs:list itemType="xs:short" />
+  </xs:simpleType>
+  <xs:simpleType name="byteList">
+    <xs:list itemType="xs:byte" />
+  </xs:simpleType>
+  <xs:simpleType name="unsignedLongList">
+    <xs:list itemType="xs:unsignedLong" />
+  </xs:simpleType>
+  <xs:simpleType name="unsignedIntList">
+    <xs:list itemType="xs:unsignedInt" />
+  </xs:simpleType>
+  <xs:simpleType name="unsignedShortList">
+    <xs:list itemType="xs:unsignedShort" />
+  </xs:simpleType>
+  <xs:simpleType name="unsignedByteList">
+    <xs:list itemType="xs:unsignedByte" />
+  </xs:simpleType>
+</xs:schema>

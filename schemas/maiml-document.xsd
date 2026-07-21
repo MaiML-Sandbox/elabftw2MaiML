@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified"
+  xmlns:ds="http://www.w3.org/2000/09/xmldsig#"
+  xmlns="http://www.maiml.org/schemas" targetNamespace="http://www.maiml.org/schemas">
+  <xs:annotation>
+    <xs:documentation>MaiML Schema Version 1.0.0</xs:documentation>
+  </xs:annotation>
+
+  <xs:include schemaLocation="maiml-simpleTypes.xsd" />
+  <xs:include schemaLocation="maiml-refTypes.xsd" />
+  <xs:include schemaLocation="maiml-property.xsd" />
+  <xs:include schemaLocation="maiml-core.xsd" />
+  <xs:import namespace="http://www.w3.org/2000/09/xmldsig#" schemaLocation="xmldsig-core-schema.xsd"/>
+
+  <xs:complexType name="documentType">
+    <xs:complexContent>
+      <xs:extension base="hasIdAttributeType">
+        <xs:sequence>
+          <xs:element ref="ds:Signature" minOccurs="0" />
+          <xs:group ref="globalObjectContentGroup" />
+          <xs:element name="creator" maxOccurs="unbounded" type="creatorType" />
+          <xs:element name="vendor" maxOccurs="unbounded" type="vendorType" />
+          <xs:element name="owner" maxOccurs="unbounded" type="ownerType" />
+          <xs:element name="instrument" minOccurs="0" maxOccurs="unbounded" type="instrumentType" />
+          <xs:element name="date" type="xs:dateTime" />
+          <xs:element name="chain" minOccurs="0" maxOccurs="unbounded" type="chainType" />
+          <xs:element name="parent" minOccurs="0" maxOccurs="unbounded" type="parentType" />
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="creatorType">
+    <xs:complexContent>
+      <xs:extension base="hasIdAttributeType">
+        <xs:sequence>
+          <xs:group ref="globalObjectContentGroup" />
+          <xs:element name="vendorRef" type="vendorRefType" maxOccurs="unbounded" />
+          <xs:element name="instrumentRef" minOccurs="0" maxOccurs="unbounded" type="instrumentRefType" />
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="vendorType">
+    <xs:complexContent>
+      <xs:extension base="hasIdAttributeType">
+        <xs:group ref="globalObjectContentGroup" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="ownerType">
+    <xs:complexContent>
+      <xs:extension base="hasIdAttributeType">
+        <xs:group ref="globalObjectContentGroup" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="instrumentType">
+    <xs:complexContent>
+      <xs:extension base="hasIdAttributeType">
+        <xs:sequence>
+          <xs:group ref="globalObjectContentGroup" />
+        </xs:sequence>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="chainType">
+    <xs:sequence>
+      <xs:element name="uuid" type="uuid" />
+      <xs:element name="hash" type="hashType" />
+      <xs:element name="chain" type="chainType" minOccurs="0" maxOccurs="unbounded" />
+    </xs:sequence>
+    <xs:attribute name="key" type="xs:string" />
+  </xs:complexType>
+
+  <xs:complexType name="parentType">
+    <xs:sequence>
+      <xs:element name="uuid" type="uuid" />
+      <xs:element name="hash" type="hashType" />
+      <xs:element name="parent" type="parentType" minOccurs="0" maxOccurs="unbounded"  />
+    </xs:sequence>
+    <xs:attribute name="key" type="xs:string" />
+  </xs:complexType>
+
+</xs:schema>
