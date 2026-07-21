@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <maiml xmlns="http://www.maiml.org/schemas" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:ns1="https://example.org/maiml/mylab" xmlns:concept="http://www.xes-standard.org/concept.xesext#" xmlns:lifecycle="http://www.xes-standard.org/lifecycle.xesext#" xmlns:time="http://www.xes-standard.org/time.xesext#" version="1.0" features="nested-attributes" xsi:type="maimlRootType">
   <document id="document_exp124">
-    <uuid>8f0e0b69-01d1-4be8-93b6-d92463a6e275</uuid>
+    <uuid>c77743bb-bd5d-4502-836d-805c5135299f</uuid>
     <description>汎用天秤による秤量</description>
     <creator id="creator_instrument">
       <uuid>f038084c-c7c1-5ed9-b04f-70dd5d5028f4</uuid>
@@ -24,12 +24,12 @@
     <date>2026-07-21T09:00:00+00:00</date>
   </document>
   <protocol id="protocol_exp124">
-    <uuid>84ec38dd-f954-4471-9987-34d7c355a007</uuid>
+    <uuid>c48e437d-972b-4c6f-ae9e-daa02f09f9d2</uuid>
     <method id="method_exp124">
-      <uuid>f436544a-aee7-4ad5-997f-a21500a64d3c</uuid>
+      <uuid>c44f4218-3a69-4083-be66-e97518f70100</uuid>
       <description>汎用天秤による秤量</description>
       <pnml id="pnml_exp124">
-        <uuid>0edcf0e6-5d17-4a97-b1a5-295ee65d5c1f</uuid>
+        <uuid>ac1689b5-dd91-40b9-8872-4c6bf20fed41</uuid>
         <place id="p_material_in"/>
         <place id="p_condition_in"/>
         <place id="p_result_out"/>
@@ -39,54 +39,56 @@
         <arc id="a3" source="t_step_601" target="p_result_out"/>
       </pnml>
       <program id="prog_exp124">
-        <uuid>ab0a19cb-1845-4ce7-92f8-ce92d9d2c212</uuid>
+        <uuid>cd7a653f-9560-4cba-ad7e-3c8364b39079</uuid>
         <instruction id="instr_step_601">
-          <uuid>b7977033-771e-4a53-aa62-880b1784ad25</uuid>
+          <uuid>c8499b35-05a5-4b58-90d9-0a745c1409ed</uuid>
           <description>秤量</description>
           <transitionRef id="tref_t_step_601" ref="t_step_601"/>
         </instruction>
         <materialTemplate id="mattmpl_0">
-          <uuid>b481c2f8-9585-493c-990b-8cf26d8bf19b</uuid>
+          <uuid>b14ca516-8aa8-422d-902b-15610ce031c0</uuid>
           <description>(no linked item)</description>
           <placeRef id="pref_mat_0" ref="p_material_in"/>
         </materialTemplate>
         <conditionTemplate id="condtmpl_exp124">
-          <uuid>1d9d9cee-74f8-4626-8ed6-6bdbfef34a6c</uuid>
+          <uuid>0b9b5012-c881-474e-ac96-9cd9e0a9de6a</uuid>
           <placeRef id="pref_cond" ref="p_condition_in"/>
         </conditionTemplate>
-        <resultTemplate id="restmpl_exp124">
-          <uuid>ac5e6a91-4eca-45ef-bc5b-990a300b10a5</uuid>
-          <placeRef id="pref_res" ref="p_result_out"/>
+        <resultTemplate id="restmpl_step_601">
+          <uuid>f54a7069-0754-47e4-98d1-43f289203638</uuid>
+          <placeRef id="pref_res_601" ref="p_result_out"/>
+          <templateRef id="tref_restmpl_step_601" ref="mattmpl_0"/>
         </resultTemplate>
       </program>
     </method>
   </protocol>
   <data id="data_exp124">
-    <uuid>ac23ffea-05a6-48b4-93ec-24bae548f407</uuid>
+    <uuid>222fcb5b-3419-4497-9335-49093f308b88</uuid>
     <results id="results_exp124">
-      <uuid>7b68d304-6625-406c-91dc-1904ad7e15ee</uuid>
+      <uuid>9167eaae-70b9-4dca-ab02-e5a1ffc0cea8</uuid>
       <material id="material_0" ref="mattmpl_0">
-        <uuid>de6019fa-d64a-4a5e-a480-430573f84d48</uuid>
+        <uuid>155526f0-5cd1-4ef2-8dc8-01846d127f49</uuid>
         <description>(no linked item)</description>
       </material>
       <condition id="condition_exp124" ref="condtmpl_exp124">
-        <uuid>8ec533bf-f660-44ce-a09f-6593593a866c</uuid>
+        <uuid>1a1e2a28-0e19-4efb-9ddd-9082e132b1cb</uuid>
       </condition>
-      <result id="result_exp124" ref="restmpl_exp124">
-        <uuid>13887b59-8480-4315-8a72-413d5d142bef</uuid>
+      <result id="result_step_601" ref="restmpl_step_601">
+        <uuid>ba92b0fb-ac9c-45f2-9ba8-664a2eb4e150</uuid>
+        <instanceRef id="iref_result_step_601" ref="material_0"/>
       </result>
     </results>
   </data>
   <eventLog id="eventLog_exp124">
-    <uuid>6a82001a-5982-4212-801c-0be0c6dce065</uuid>
+    <uuid>00f18626-bde5-4089-a126-054682720271</uuid>
     <log id="log_exp124" ref="method_exp124">
-      <uuid>dc829264-fb7b-48e8-af35-f3ed34bc03f3</uuid>
+      <uuid>894f284f-a051-40f2-af23-a71561dcf079</uuid>
       <trace id="trace_exp124" ref="prog_exp124">
-        <uuid>bffa9264-55dc-4bf1-a0a9-0f606dd31676</uuid>
+        <uuid>02073ac0-d101-4f8e-9f2b-9004a4a89d2c</uuid>
         <event id="event_start_601" ref="instr_step_601">
-          <uuid>74641112-7590-41c7-9b6f-5c27d42d4bf9</uuid>
+          <uuid>17c2444e-9339-409d-a8ad-eba94c5de781</uuid>
           <property key="concept:instance" xsi:type="uuidType">
-            <value>6c45a53d-cd6f-4a8a-8a5d-ac9fc5cbcf5b</value>
+            <value>d22c137a-f73b-4231-882d-b922df666b72</value>
           </property>
           <property key="lifecycle:transition" xsi:type="stringType">
             <value>start</value>
@@ -96,9 +98,9 @@
           </property>
         </event>
         <event id="event_complete_601" ref="instr_step_601">
-          <uuid>e8af3262-57b8-4eea-9d85-649450fcf718</uuid>
+          <uuid>6c34e97e-c7c9-4a4a-b68f-22b31df6a342</uuid>
           <property key="concept:instance" xsi:type="uuidType">
-            <value>6c45a53d-cd6f-4a8a-8a5d-ac9fc5cbcf5b</value>
+            <value>d22c137a-f73b-4231-882d-b922df666b72</value>
           </property>
           <property key="lifecycle:transition" xsi:type="stringType">
             <value>complete</value>

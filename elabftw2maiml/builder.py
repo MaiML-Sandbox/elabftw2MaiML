@@ -17,12 +17,22 @@ ExperimentData (eLabFTWから取得したデータ) -> MaiML <maiml> ルート�
                           単純な直列ペトリネット。
   protocol/.../program/instruction
                        = eLabFTWの各Step (Steps API) = 1 instruction。
-  materialTemplate     = リンクされたeLabFTW Item (試料・機器等) 1件につき1つ。
-  conditionTemplate    = 実験のExtra Fields (カスタムフィールド) をまとめて1つ。
-  resultTemplate       = 実験本文・添付ファイルの参照先として1つ。
+  materialTemplate     = リンクされたeLabFTW Item (試料・機器等) は最初のSTEPのみが消費する。
+                          実データ (試料の性質など) はここに持たせる。
+  conditionTemplate    = 実験のExtra Fields (カスタムフィールド) をまとめて1つ。最初のSTEPが消費する。
+  resultTemplate        = STEPごとに1つ作成する (MaiMLの一般的な考え方: 各STEPがmaterial/condition/resultを
+                          持つ、というモデルに準拠)。
+                            - 最初のSTEP(R1): templateRefでmaterialTemplate(M1)を参照。汎用データコンテナなし
+                              (実データは既にM1側にあるため)
+                            - 途中のSTEP: templateRefでR1を参照 (前STEPの結果を入力材料として引き継ぐ、
+                              というMaiMLの一般的な考え方の簡易実装)。汎用データコンテナは持たない
+                              (参照先の情報を自動継承するため)
+                            - 最後のSTEP: templateRefで直前のSTEPのresultTemplateを参照。ここに実験の
+                              実データ (本文/タグ/添付ファイル) を持たせる
 
   data/results/material/condition/result
-                       = 上記テンプレートに対応する実測値インスタンス。
+                       = 上記テンプレートに対応する実測値インスタンス。resultは同じ接続パターンを
+                         instanceRef (templateRefのインスタンス層版) で反映する。
 
   eventLog             = 各StepについてSTART/COMPLETEイベントを記録。
                           結果を記録した最終Stepのイベントに resultsRef を付与し、
@@ -208,6 +218,8 @@ class MaimlBuilder:
         )
 
         # materialTemplate: リンクされたItem 1件につき1つ (無ければ汎用1つ)
+        # -> 最初のSTEPのみが消費する。2つ目以降のSTEPは独自のmaterialTemplateを
+        #    作らず、前STEPのresultTemplateを実質的な入力材料として扱う。
         material_templates = []
         material_template_ids = []
         materials = exp.materials or [LinkedItem(elab_id=0, title="(no linked item)")]
@@ -221,6 +233,10 @@ class MaimlBuilder:
                 mx.ref_el("placeRef", p_material_in, f"pref_mat_{item.elab_id}"),
                 id=tmpl_id,
             ))
+        # チェーンの起点 (最初のSTEPのresultTemplate=R1がtemplateRefで指す先)
+        first_material_template_id = material_template_ids[0]
+        # (2つ目以降のSTEPはmaterialTemplateを作らず、最初のSTEPのresultTemplate(R1)への
+        #  templateRefで入力材料を引き継ぐ)
 
         cond_tmpl_id = f"condtmpl_exp{exp.elab_id}"
         cond_props = [_property_from_pv(p) for p in exp.condition_properties]
@@ -231,13 +247,50 @@ class MaimlBuilder:
             id=cond_tmpl_id,
         )
 
-        res_tmpl_id = f"restmpl_exp{exp.elab_id}"
-        result_template = mx.E(
-            "resultTemplate",
-            *mx.global_content(new_uuid()),
-            mx.ref_el("placeRef", p_result_out, "pref_res"),
-            id=res_tmpl_id,
-        )
+        # resultTemplate: STEPごとに1つ作る。
+        #   - 最初のSTEP: templateRefで materialTemplate(M1) を参照。汎用データコンテナなし
+        #     (実データはM1側が既に持っているため、R1は参照のみ)
+        #   - 途中のSTEP: templateRefで最初のSTEPのresultTemplate(R1)を参照。汎用データコンテナなし
+        #     (M1をそのまま参照として引き継ぐ、という位置づけをR1経由で表現する)
+        #   - 最後のSTEP: templateRefで直前のSTEPのresultTemplateを参照。
+        #     ここに実験の実データ (本文/タグ/添付ファイル) を持たせる
+        result_templates = []
+        step_result_template_ids = []  # [(step_key, tmpl_id), ...] STEP順
+        prev_result_tmpl_id = None
+        first_result_template_id = None
+        n_steps = len(steps)
+        for i, step in enumerate(steps):
+            step_key = step.elab_id if step.elab_id else i
+            tmpl_id = f"restmpl_step_{step_key}"
+
+            is_first = (i == 0)
+            is_last = (i == n_steps - 1)
+
+            if is_first:
+                # 最初のSTEP -> materialTemplate(M1)へ
+                template_ref_el = mx.ref_el("templateRef", first_material_template_id, f"tref_{tmpl_id}")
+            elif not is_last:
+                # 途中のSTEP -> 最初のSTEPのresultTemplate(R1)へ
+                template_ref_el = mx.ref_el("templateRef", first_result_template_id, f"tref_{tmpl_id}")
+            else:
+                # 最後のSTEP -> 直前のSTEPのresultTemplateへ
+                template_ref_el = mx.ref_el("templateRef", prev_result_tmpl_id, f"tref_{tmpl_id}")
+
+            props = list(exp.result_properties) if is_last else []
+            # 実験全体の実データ (本文/タグ) は最後のSTEPのみに持たせる。
+            # 最初/途中のSTEPは汎用データコンテナを持たない (参照先から自動継承)
+
+            content_children = mx.global_content(new_uuid(), properties=[_property_from_pv(p) for p in props])
+
+            children = list(content_children)
+            children.append(mx.ref_el("placeRef", p_result_out, f"pref_res_{step_key}"))
+            children.append(template_ref_el)
+
+            result_templates.append(mx.E("resultTemplate", *children, id=tmpl_id))
+            step_result_template_ids.append((step_key, tmpl_id))
+            if is_first:
+                first_result_template_id = tmpl_id
+            prev_result_tmpl_id = tmpl_id
 
         program_el = mx.E(
             "program",
@@ -245,7 +298,7 @@ class MaimlBuilder:
             *instructions,
             *material_templates,
             condition_template,
-            result_template,
+            *result_templates,
             id=program_id,
         )
 
@@ -265,23 +318,27 @@ class MaimlBuilder:
         )
 
         return (protocol_el, method_id, program_id, step_instruction_ids,
-                material_template_ids, cond_tmpl_id, res_tmpl_id)
+                material_template_ids, cond_tmpl_id, step_result_template_ids)
 
     # -- data ---------------------------------------------------------------
 
-    def _build_data(self, exp: ExperimentData, material_template_ids, cond_tmpl_id, res_tmpl_id):
+    def _build_data(self, exp: ExperimentData, material_template_ids, cond_tmpl_id, step_result_template_ids):
         results_id = f"results_exp{exp.elab_id}"
 
         materials = exp.materials or [LinkedItem(elab_id=0, title="(no linked item)")]
         material_instances = []
+        material_instance_ids = []
         for item, tmpl_id in zip(materials, material_template_ids):
             props = [_property_from_pv(p) for p in item.properties]
+            inst_id = f"material_{item.elab_id}"
+            material_instance_ids.append(inst_id)
             material_instances.append(mx.E(
                 "material",
                 *mx.global_content(new_uuid(), description=item.title, properties=props),
-                id=f"material_{item.elab_id}",
+                id=inst_id,
                 ref=tmpl_id,
             ))
+        first_material_instance_id = material_instance_ids[0]
 
         cond_props = [_property_from_pv(p) for p in exp.condition_properties]
         condition_instance = mx.E(
@@ -291,24 +348,50 @@ class MaimlBuilder:
             ref=cond_tmpl_id,
         )
 
-        insertions = [
-            mx.insertion_el(uri=u.uri, file_hash_b64=u.hash_b64, hash_method=u.hash_method, fmt=None)
-            for u in exp.uploads
-        ]
-        result_props = [_property_from_pv(p) for p in exp.result_properties]
-        result_instance = mx.E(
-            "result",
-            *mx.global_content(new_uuid(), insertions=insertions, properties=result_props),
-            id=f"result_exp{exp.elab_id}",
-            ref=res_tmpl_id,
-        )
+        # result: STEPごとに1つ、対応するresultTemplateと同じ接続パターンをinstanceRefで反映する。
+        #   - 最初のSTEP: instanceRefでmaterialインスタンス(M1)を参照。汎用データコンテナなし
+        #   - 途中のSTEP: instanceRefで最初のSTEPのresultインスタンス(R1)を参照。汎用データコンテナなし
+        #   - 最後のSTEP: instanceRefで直前のSTEPのresultインスタンスを参照。実データを保持
+        result_instances = []
+        prev_result_instance_id = None
+        first_result_instance_id = None
+        n_steps = len(step_result_template_ids)
+        for i, (step_key, tmpl_id) in enumerate(step_result_template_ids):
+            inst_id = f"result_step_{step_key}"
+            is_first = (i == 0)
+            is_last = (i == n_steps - 1)
+
+            if is_first:
+                instance_ref_el = mx.ref_el("instanceRef", first_material_instance_id, f"iref_{inst_id}")
+            elif not is_last:
+                instance_ref_el = mx.ref_el("instanceRef", first_result_instance_id, f"iref_{inst_id}")
+            else:
+                instance_ref_el = mx.ref_el("instanceRef", prev_result_instance_id, f"iref_{inst_id}")
+
+            if is_last:
+                insertions = [
+                    mx.insertion_el(uri=u.uri, file_hash_b64=u.hash_b64, hash_method=u.hash_method, fmt=None)
+                    for u in exp.uploads
+                ]
+                result_props = [_property_from_pv(p) for p in exp.result_properties]
+                content_children = mx.global_content(new_uuid(), insertions=insertions, properties=result_props)
+            else:
+                content_children = mx.global_content(new_uuid())
+
+            children = list(content_children)
+            children.append(instance_ref_el)
+
+            result_instances.append(mx.E("result", *children, id=inst_id, ref=tmpl_id))
+            if is_first:
+                first_result_instance_id = inst_id
+            prev_result_instance_id = inst_id
 
         results_el = mx.E(
             "results",
             *mx.global_content(new_uuid()),
             *material_instances,
             condition_instance,
-            result_instance,
+            *result_instances,
             id=results_id,
         )
 
@@ -405,8 +488,8 @@ class MaimlBuilder:
 
         document_el = self._build_document(exp)
         (protocol_el, method_id, program_id, step_instruction_ids,
-         material_template_ids, cond_tmpl_id, res_tmpl_id) = self._build_protocol(exp)
-        data_el, results_id = self._build_data(exp, material_template_ids, cond_tmpl_id, res_tmpl_id)
+         material_template_ids, cond_tmpl_id, step_result_template_ids) = self._build_protocol(exp)
+        data_el, results_id = self._build_data(exp, material_template_ids, cond_tmpl_id, step_result_template_ids)
         event_log_el = self._build_event_log(exp, method_id, program_id, step_instruction_ids, results_id)
 
         root.append(document_el)

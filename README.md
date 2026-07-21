@@ -55,9 +55,30 @@ python elabftw_to_maiml.py --experiment-id 123 --output experiment_123.maiml
 | 実験のカスタムフィールド「装置メーカー」等 (既定候補名で検索) | `document/vendor` | creatorは見つかったがvendorフィールドが無い場合は「メーカー不明」のダミーvendorを作成 (creatorTypeがvendorRefを1つ以上要求するため)。creator自体が見つからなければDeltablot (eLabFTW開発元) にフォールバック |
 | 実験の作成日時 (`date`/`created_at`) | `document/date` | ISO8601に変換 |
 | 実験のStep一覧 (Steps API, `ordering`順) | `protocol/method/pnml` の `transition` (直列に接続) + `program/instruction` | 1 Step = 1 transition = 1 instruction |
-| リンクされたアイテム (`items_links`、詳細は `ItemsApi.get_item`) | `protocol/.../materialTemplate` + `data/.../material` | アイテムのExtra Fieldsを `property` に変換 |
-| 実験のExtra Fields (`metadata.extra_fields`。creator/vendorに使ったフィールドは除外) | `protocol/.../conditionTemplate` + `data/.../condition` | 1つの `conditionTemplate`/`condition` にまとめて格納 |
-| 実験本文 (`body`, HTMLタグ除去) / タグ (`tags`) | `data/.../result` の `property` | `resultTemplate`/`result` にまとめて格納 |
+| リンクされたアイテム (`items_links`、詳細は `ItemsApi.get_item`) | 最初のSTEPの `materialTemplate`(M1) + `data/.../material` | アイテムのExtra Fieldsを `property` に変換。実データはここに持たせる |
+| 実験のExtra Fields (`metadata.extra_fields`。creator/vendorに使ったフィールドは除外) | 最初のSTEPの `conditionTemplate`(C1) + `data/.../condition` | 1つの `conditionTemplate`/`condition` にまとめて格納 |
+| 実験本文 (`body`, HTMLタグ除去) / タグ (`tags`) / 添付ファイル | 最後のSTEPの `resultTemplate`/`result` の `property`/`insertion` | 実データは最後のSTEPに集約する |
+
+### STEP間のmaterial/condition/result連鎖
+
+MaiMLでは各STEPがmaterial/condition/resultを持ち、直列に接続する場合は前STEPの結果が
+次STEPの入力材料として引き継がれる、という考え方をとります。eLabFTWのSteps APIには
+Step単位の構造化されたmaterial/result情報が無いため (`body`の自由記述テキストのみ)、
+以下の既定パターンで機械的に接続しています:
+
+| STEP | 入力 | 出力 (resultTemplate) | 汎用データコンテナ |
+| --- | --- | --- | --- |
+| 最初のSTEP (R1) | `materialTemplate`(M1) + `conditionTemplate`(C1) | `templateRef`でM1を参照 | なし (実データはM1側に既にある) |
+| 途中のSTEP (Ri) | 直前の結果 (R1) | `templateRef`でR1を参照 | なし (参照先から自動継承) |
+| 最後のSTEP (Rn) | 直前のSTEPの結果 (R{n-1}) | `templateRef`で直前のresultTemplateを参照 | あり (実験本文/タグ/添付ファイル) |
+
+`data/results` 内の `material`/`condition`/`result` インスタンスも、`instanceRef` で同じ接続パターンを反映します
+(`templateRef`のインスタンス層版)。1 STEPのみの実験ではこの連鎖は発生せず、単純に
+M1→R1(templateRef)という1段の参照になります。
+
+**制約**: 途中で新しい試料 (別material) を追加する分岐フローは、eLabFTW側にSTEP単位の
+構造化情報が無いため自動判定できません。そのような実験がある場合は、生成後のXMLを
+手動編集するか、`elabftw_client.py`側でStep本文の記法解析等を追加実装してください。
 | 添付ファイル (`uploads`, ハッシュ値含む) | `data/.../result/insertion` | ダウンロードURL + ハッシュ値を参照として記録 (ファイル本体はMaiMLに埋め込まない) |
 | 各Stepの開始/終了 (`finished_time`) | `eventLog/log/trace/event` (start/complete) | 最終Stepのcompleteイベントに `resultsRef` を付与 (仕様R-16準拠) |
 
