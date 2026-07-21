@@ -3,11 +3,13 @@ ExperimentData (eLabFTWから取得したデータ) -> MaiML <maiml> ルート�
 
 マッピング方針 (READMEにも記載):
 
-  document/creator   = このコンバータ (elabftw-to-maiml)。ソフトウェアの版が変われば別UUID。
-  document/vendor    = eLabFTWの開発元 (Deltablot)。名前ベースUUIDで固定。
+  document/creator   = 実験のカスタムフィールド (既定候補: 「使用装置」等) から取得。
+                        フィールドが無ければこのコンバータ自身にフォールバックする。
+  document/vendor    = 同様にカスタムフィールド (既定候補: 「装置メーカー」等) から取得。
+                        creator/vendorとも見つからなければ Deltablot にフォールバックする。
   document/owner     = eLabFTW実験のオーナー (ユーザー)。ユーザーIDから名前ベースUUIDを生成、
                         同一ユーザーは常に同一UUIDになる。
-  document/instrument = 未使用 (0以上のため省略可)。装置管理が必要な場合はexperiment.instrumentを追加实装。
+  document/instrument = カスタムフィールドからcreatorを特定できた場合のみ、同じ表示名で追加する。
   document/date       = 実験の date (作成日)。
 
   protocol/method     = 実験1件 = 1 method。
@@ -86,23 +88,38 @@ class MaimlBuilder:
     # -- document ---------------------------------------------------------
 
     def _build_document(self, exp: ExperimentData) -> etree._Element:
-        creator_party = self._software_creator()
-        vendor_party = self._vendor()
+        creator_party = exp.creator or self._software_creator()
+        vendor_party = exp.vendor or self._vendor()
 
         creator_uuid = named_uuid(creator_party.key)
         vendor_uuid = named_uuid(vendor_party.key)
 
         vendor_el = mx.E(
             "vendor",
-            *mx.global_content(vendor_uuid, name=vendor_party.name, description=vendor_party.description),
-            id="vendor_deltablot",
+            *mx.global_content(vendor_uuid, description=vendor_party.name),
+            id="vendor_of_creator",
         )
+
+        instrument_el = None
+        instrument_ref_el = None
+        if exp.instrument is not None:
+            instrument_uuid = named_uuid(exp.instrument.key)
+            instrument_el = mx.E(
+                "instrument",
+                *mx.global_content(instrument_uuid, description=exp.instrument.name),
+                id="instrument_general",
+            )
+            instrument_ref_el = mx.ref_el("instrumentRef", "instrument_general", "iref_creator")
+
+        creator_children = [mx.ref_el("vendorRef", "vendor_of_creator", "vref_creator")]
+        if instrument_ref_el is not None:
+            creator_children.append(instrument_ref_el)
 
         creator_el = mx.E(
             "creator",
-            *mx.global_content(creator_uuid, name=creator_party.name, description=creator_party.description),
-            mx.ref_el("vendorRef", "vendor_deltablot", "vref_deltablot"),
-            id="creator_elabftw2maiml",
+            *mx.global_content(creator_uuid, description=creator_party.name),
+            *creator_children,
+            id="creator_instrument",
         )
 
         owner_party = exp.owner or Party(key=f"elabftw-unknown-owner@{self.elab_host}", name="unknown")
@@ -115,12 +132,13 @@ class MaimlBuilder:
 
         doc_uuid = new_uuid()
         doc_children = mx.global_content(doc_uuid, description=exp.title)
+        document_children = [creator_el, vendor_el, owner_el]
+        if instrument_el is not None:
+            document_children.append(instrument_el)
         return mx.E(
             "document",
             *doc_children,
-            creator_el,
-            vendor_el,
-            owner_el,
+            *document_children,
             mx.text_el("date", _dt(exp.date)),
             id=f"document_exp{exp.elab_id}",
         )

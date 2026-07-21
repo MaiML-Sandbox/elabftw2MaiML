@@ -1,0 +1,114 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<maiml xmlns="http://www.maiml.org/schemas" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:ns1="https://example.org/maiml/mylab" xmlns:concept="http://www.xes-standard.org/concept.xesext#" xmlns:lifecycle="http://www.xes-standard.org/lifecycle.xesext#" xmlns:time="http://www.xes-standard.org/time.xesext#" version="1.0" features="nested-attributes" xsi:type="maimlRootType">
+  <document id="document_exp124">
+    <uuid>8f0e0b69-01d1-4be8-93b6-d92463a6e275</uuid>
+    <description>汎用天秤による秤量</description>
+    <creator id="creator_instrument">
+      <uuid>f038084c-c7c1-5ed9-b04f-70dd5d5028f4</uuid>
+      <description>FT-IR IRAffinity-1S</description>
+      <vendorRef id="vref_creator" ref="vendor_of_creator"/>
+      <instrumentRef id="iref_creator" ref="instrument_general"/>
+    </creator>
+    <vendor id="vendor_of_creator">
+      <uuid>490fe155-fb98-5481-ba4c-aca86689e156</uuid>
+      <description>Shimadzu</description>
+    </vendor>
+    <owner id="owner_experiment">
+      <uuid>d038334f-f81e-5600-a765-3271ef56ed0a</uuid>
+      <description>Suzuki Hanako</description>
+    </owner>
+    <instrument id="instrument_general">
+      <uuid>9c9eb4ec-431f-5c1c-98d6-5afc689e5888</uuid>
+      <description>FT-IR IRAffinity-1S</description>
+    </instrument>
+    <date>2026-07-21T09:00:00+00:00</date>
+  </document>
+  <protocol id="protocol_exp124">
+    <uuid>84ec38dd-f954-4471-9987-34d7c355a007</uuid>
+    <method id="method_exp124">
+      <uuid>f436544a-aee7-4ad5-997f-a21500a64d3c</uuid>
+      <description>汎用天秤による秤量</description>
+      <pnml id="pnml_exp124">
+        <uuid>0edcf0e6-5d17-4a97-b1a5-295ee65d5c1f</uuid>
+        <place id="p_material_in"/>
+        <place id="p_condition_in"/>
+        <place id="p_result_out"/>
+        <transition id="t_step_601"/>
+        <arc id="a1" source="p_material_in" target="t_step_601"/>
+        <arc id="a2" source="p_condition_in" target="t_step_601"/>
+        <arc id="a3" source="t_step_601" target="p_result_out"/>
+      </pnml>
+      <program id="prog_exp124">
+        <uuid>ab0a19cb-1845-4ce7-92f8-ce92d9d2c212</uuid>
+        <instruction id="instr_step_601">
+          <uuid>b7977033-771e-4a53-aa62-880b1784ad25</uuid>
+          <description>秤量</description>
+          <transitionRef id="tref_t_step_601" ref="t_step_601"/>
+        </instruction>
+        <materialTemplate id="mattmpl_0">
+          <uuid>b481c2f8-9585-493c-990b-8cf26d8bf19b</uuid>
+          <description>(no linked item)</description>
+          <placeRef id="pref_mat_0" ref="p_material_in"/>
+        </materialTemplate>
+        <conditionTemplate id="condtmpl_exp124">
+          <uuid>1d9d9cee-74f8-4626-8ed6-6bdbfef34a6c</uuid>
+          <placeRef id="pref_cond" ref="p_condition_in"/>
+        </conditionTemplate>
+        <resultTemplate id="restmpl_exp124">
+          <uuid>ac5e6a91-4eca-45ef-bc5b-990a300b10a5</uuid>
+          <placeRef id="pref_res" ref="p_result_out"/>
+        </resultTemplate>
+      </program>
+    </method>
+  </protocol>
+  <data id="data_exp124">
+    <uuid>ac23ffea-05a6-48b4-93ec-24bae548f407</uuid>
+    <results id="results_exp124">
+      <uuid>7b68d304-6625-406c-91dc-1904ad7e15ee</uuid>
+      <material id="material_0" ref="mattmpl_0">
+        <uuid>de6019fa-d64a-4a5e-a480-430573f84d48</uuid>
+        <description>(no linked item)</description>
+      </material>
+      <condition id="condition_exp124" ref="condtmpl_exp124">
+        <uuid>8ec533bf-f660-44ce-a09f-6593593a866c</uuid>
+      </condition>
+      <result id="result_exp124" ref="restmpl_exp124">
+        <uuid>13887b59-8480-4315-8a72-413d5d142bef</uuid>
+      </result>
+    </results>
+  </data>
+  <eventLog id="eventLog_exp124">
+    <uuid>6a82001a-5982-4212-801c-0be0c6dce065</uuid>
+    <log id="log_exp124" ref="method_exp124">
+      <uuid>dc829264-fb7b-48e8-af35-f3ed34bc03f3</uuid>
+      <trace id="trace_exp124" ref="prog_exp124">
+        <uuid>bffa9264-55dc-4bf1-a0a9-0f606dd31676</uuid>
+        <event id="event_start_601" ref="instr_step_601">
+          <uuid>74641112-7590-41c7-9b6f-5c27d42d4bf9</uuid>
+          <property key="concept:instance" xsi:type="uuidType">
+            <value>6c45a53d-cd6f-4a8a-8a5d-ac9fc5cbcf5b</value>
+          </property>
+          <property key="lifecycle:transition" xsi:type="stringType">
+            <value>start</value>
+          </property>
+          <property key="time:timestamp" xsi:type="dateTimeType">
+            <value>2026-07-21T09:00:00+00:00</value>
+          </property>
+        </event>
+        <event id="event_complete_601" ref="instr_step_601">
+          <uuid>e8af3262-57b8-4eea-9d85-649450fcf718</uuid>
+          <property key="concept:instance" xsi:type="uuidType">
+            <value>6c45a53d-cd6f-4a8a-8a5d-ac9fc5cbcf5b</value>
+          </property>
+          <property key="lifecycle:transition" xsi:type="stringType">
+            <value>complete</value>
+          </property>
+          <property key="time:timestamp" xsi:type="dateTimeType">
+            <value>2026-07-21T09:05:00+00:00</value>
+          </property>
+          <resultsRef id="resref_601" ref="results_exp124"/>
+        </event>
+      </trace>
+    </log>
+  </eventLog>
+</maiml>

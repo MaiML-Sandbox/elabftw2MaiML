@@ -38,13 +38,23 @@ def main() -> int:
     parser.add_argument("--ns-uri", default="https://example.org/maiml/mylab",
                          help="ns-prefix に対応する名前空間URI")
     parser.add_argument("--insecure", action="store_true", help="TLS証明書検証を無効化する (自己署名証明書の開発環境向け)")
+    parser.add_argument("--creator-field", action="append", default=None,
+                         help="creator(使用装置)として扱うカスタムフィールド名。複数指定可。"
+                              "省略時は「使用装置」「Instrument」等の既定候補を使用")
+    parser.add_argument("--vendor-field", action="append", default=None,
+                         help="vendor(装置メーカー)として扱うカスタムフィールド名。複数指定可。"
+                              "省略時は「装置メーカー」「Vendor」等の既定候補を使用")
     args = parser.parse_args()
 
     if not args.host or not args.api_key:
         parser.error("--host/--api-key (または環境変数 ELABFTW_HOST/ELABFTW_API_KEY) が必要です")
 
     client = ElabftwClient(host_url=args.host, api_key=args.api_key, verify_ssl=not args.insecure)
-    exp_data = client.fetch_experiment(args.experiment_id, ns_prefix=args.ns_prefix)
+    exp_data = client.fetch_experiment(
+        args.experiment_id, ns_prefix=args.ns_prefix,
+        creator_field_candidates=args.creator_field,
+        vendor_field_candidates=args.vendor_field,
+    )
 
     builder = MaimlBuilder(ns_prefix=args.ns_prefix, ns_uri=args.ns_uri,
                             elab_host=client.base_url)

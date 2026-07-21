@@ -57,16 +57,35 @@ with open(out_path, "wb") as f:
     f.write(xml_bytes)
 print(f"wrote {out_path} ({len(xml_bytes)} bytes)")
 
+# --- second sample: creator/vendor/instrument derived from custom fields ---
+from elabftw2maiml.model import Party as _Party
+
+exp2 = ExperimentData(
+    elab_id=124,
+    title="汎用天秤による秤量",
+    date=datetime(2026, 7, 21, 9, 0, 0, tzinfo=timezone.utc),
+    owner=Party(key="elabftw-user-7@elab.example.org", name="Suzuki Hanako"),
+    creator=_Party(key="elabftw-device:FT-IR IRAffinity-1S", name="FT-IR IRAffinity-1S"),
+    vendor=_Party(key="elabftw-device-vendor:Shimadzu", name="Shimadzu"),
+    instrument=_Party(key="elabftw-instrument:FT-IR IRAffinity-1S", name="FT-IR IRAffinity-1S"),
+    steps=[Step(elab_id=601, title="秤量", finished_at=datetime(2026, 7, 21, 9, 5, tzinfo=timezone.utc),
+                is_finished=True)],
+)
+xml_bytes2 = builder.to_bytes(exp2)
+with open("sample_output_2.maiml", "wb") as f:
+    f.write(xml_bytes2)
+
 # --- validate against the uploaded XSD ---
 schema_doc = etree.parse("schemas/maiml.xsd")
 schema = etree.XMLSchema(schema_doc)
 
-doc = etree.fromstring(xml_bytes)
-ok = schema.validate(doc)
-print("Schema valid:", ok)
-if not ok:
-    for err in schema.error_log:
-        print(" -", err)
-    sys.exit(1)
-else:
-    print("OK: sample_output.maiml is valid against maiml.xsd")
+for label, xb in [("sample_output.maiml", xml_bytes), ("sample_output_2.maiml", xml_bytes2)]:
+    doc = etree.fromstring(xb)
+    ok = schema.validate(doc)
+    print(f"Schema valid ({label}):", ok)
+    if not ok:
+        for err in schema.error_log:
+            print(" -", err)
+        sys.exit(1)
+
+print("OK: both sample outputs are valid against maiml.xsd")

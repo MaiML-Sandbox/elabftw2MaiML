@@ -40,6 +40,12 @@ _EXTRA_FIELD_TYPE_MAP = {
     "experiments": "stringType",
 }
 
+# 実験のカスタムフィールド名から creator(使用装置) / vendor(装置メーカー) を
+# 拾い上げる際の既定候補名 (大文字小文字を区別せずマッチ)。
+# 実験ごとにフィールド名が異なる場合は fetch_experiment() の引数で上書き可能。
+DEFAULT_CREATOR_FIELD_CANDIDATES = ["使用装置", "使用機器", "装置", "機器", "Instrument", "Equipment", "Device"]
+DEFAULT_VENDOR_FIELD_CANDIDATES = ["装置メーカー", "メーカー", "製造元", "Vendor", "Manufacturer"]
+
 _TAG_RE = re.compile(r"<[^>]+>")
 
 
@@ -99,11 +105,14 @@ class ElabftwClient:
             name=display,
         )
 
-    def _extra_fields_to_properties(self, metadata, ns_prefix: str) -> list:
+    def _extra_fields_to_properties(self, metadata, ns_prefix: str, exclude_names: Optional[set] = None) -> list:
         props = []
         if metadata is None or not getattr(metadata, "extra_fields", None):
             return props
+        exclude_names = exclude_names or set()
         for field_name, field in metadata.extra_fields.items():
+            if field_name in exclude_names:
+                continue
             xsi_type = _EXTRA_FIELD_TYPE_MAP.get(field.type, "stringType")
             key = f"{ns_prefix}:{_sanitize_ncname(field_name)}"
             props.append(PropertyValue(
@@ -113,6 +122,51 @@ class ElabftwClient:
                 description=getattr(field, "description", None) or None,
             ))
         return props
+
+    def _find_field(self, metadata, candidates: list) -> tuple:
+        """
+        候補名リストのいずれかに(大文字小文字を区別せず)一致し、かつ値が入力されている
+        カスタムフィールドを探す。見つかれば (実際のフィールド名, 値) を返す。
+        """
+        if metadata is None or not getattr(metadata, "extra_fields", None):
+            return None, None
+        lower_map = {k.lower(): k for k in metadata.extra_fields.keys()}
+        for cand in candidates:
+            actual_key = lower_map.get(cand.lower())
+            if actual_key:
+                f = metadata.extra_fields[actual_key]
+                if f.value:
+                    return actual_key, f.value
+        return None, None
+
+    def _creator_vendor_parties(self, metadata, creator_candidates: list,
+                                 vendor_candidates: list) -> tuple:
+        """
+        「使用装置」等のカスタムフィールドから creator/vendor の Party を作る。
+        戻り値: (creator_party or None, vendor_party or None, {使用したフィールド名の集合})
+
+        - creator候補フィールドが見つからなければ (None, None, set()) を返す
+          (呼び出し側でツール自身/Deltablotへのフォールバックが働く)
+        - creatorは見つかったがvendor候補が見つからない場合、creatorTypeがvendorRefを
+          1つ以上要求するため「メーカー不明」のダミーvendorを作る
+        """
+        creator_field, creator_value = self._find_field(metadata, creator_candidates)
+        if not creator_value:
+            return None, None, set()
+
+        used_fields = {creator_field}
+        creator_party = Party(key=f"elabftw-device:{creator_value.strip()}", name=creator_value.strip())
+
+        vendor_field, vendor_value = self._find_field(metadata, vendor_candidates)
+        if vendor_value:
+            used_fields.add(vendor_field)
+            vendor_party = Party(key=f"elabftw-device-vendor:{vendor_value.strip()}", name=vendor_value.strip())
+        else:
+            vendor_party = Party(
+                key=f"elabftw-device-vendor-unknown:{creator_value.strip()}",
+                name=f"(unspecified vendor of {creator_value.strip()})",
+            )
+        return creator_party, vendor_party, used_fields
 
     def _fetch_linked_materials(self, experiment, ns_prefix: str) -> list:
         materials = []
@@ -160,13 +214,38 @@ class ElabftwClient:
 
     # -- 公開API -------------------------------------------------------------
 
-    def fetch_experiment(self, experiment_id: int, ns_prefix: str = "ns1") -> ExperimentData:
+    def fetch_experiment(self, experiment_id: int, ns_prefix: str = "ns1",
+                          creator_field_candidates: Optional[list] = None,
+                          vendor_field_candidates: Optional[list] = None) -> ExperimentData:
+        """
+        creator_field_candidates / vendor_field_candidates:
+            「使用装置」「装置メーカー」等、実験のカスタムフィールドからcreator/vendorを
+            拾い上げる際に探すフィールド名の候補リスト (大文字小文字を区別せずマッチ)。
+            省略時は DEFAULT_CREATOR_FIELD_CANDIDATES / DEFAULT_VENDOR_FIELD_CANDIDATES を使う。
+            該当フィールドが無い/未入力の場合は、creator=このツール自身 / vendor=Deltablot に
+            フォールバックする (builder.py 側の既定動作)。
+        """
         experiment = self.experiments_api.get_experiment(experiment_id)
 
         owner = self._owner_party(experiment.userid, experiment.fullname)
         steps = self._steps_to_model(experiment)
         materials = self._fetch_linked_materials(experiment, ns_prefix)
-        condition_props = self._extra_fields_to_properties(experiment.metadata, ns_prefix)
+
+        creator_party, vendor_party, used_fields = self._creator_vendor_parties(
+            experiment.metadata,
+            creator_field_candidates or DEFAULT_CREATOR_FIELD_CANDIDATES,
+            vendor_field_candidates or DEFAULT_VENDOR_FIELD_CANDIDATES,
+        )
+        instrument_party = None
+        if creator_party is not None:
+            # 一般名(instrument)と個体(creator)を同じ表示名から作る簡易実装。
+            # 型式とシリアル番号を別フィールドで分けて管理したい場合は、
+            # creator_party/instrument_partyの生成ロジックをここで分離してください。
+            instrument_party = Party(key=f"elabftw-instrument:{creator_party.name}", name=creator_party.name)
+
+        condition_props = self._extra_fields_to_properties(
+            experiment.metadata, ns_prefix, exclude_names=used_fields)
+
         uploads = self._fetch_uploads(experiment)
         body_text = _strip_html(experiment.body)
 
@@ -193,6 +272,9 @@ class ElabftwClient:
             date=exp_date,
             body_text=body_text,
             owner=owner,
+            creator=creator_party,
+            vendor=vendor_party,
+            instrument=instrument_party,
             steps=steps,
             materials=materials,
             condition_properties=condition_props,
