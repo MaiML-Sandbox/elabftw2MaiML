@@ -3,6 +3,11 @@
 eLabFTW (REST API v2 / `elabapi-python`) の実験データを、JIS K 0200 (MaiML v1.0) 形式の
 `.maiml` ファイルに変換するツールです。
 
+> **本ツールは eLabFTW / Deltablot 社とは無関係な非公式ツールです。**
+> eLabFTWおよびそのAPIはDeltablot社が開発するオープンソースソフトウェアであり、本ツールは
+> それを利用する第三者スクリプトです。Deltablot社による公認・サポートは受けていません。
+
+
 **実験データの入力は eLabFTW の GUI（ブラウザ / `elabftw/desktop`）で行い、本ツールはその結果を
 読み出して MaiML に変換するだけ**、という運用を想定しています（書き込みは行いません）。
 
@@ -13,6 +18,53 @@ eLabFTW (REST API v2 / `elabapi-python`) の実験データを、JIS K 0200 (Mai
 python3 test_build_and_validate.py
 # -> Schema valid: True
 ```
+
+## 対応するeLabFTWバージョン
+
+- eLabFTW REST API v2 を使用します (API v1は対象外)。REST API v2は eLabFTW 4.0以降で
+  利用可能ですが、`elabapi-python` パッケージ自体はeLabFTW側のスキーマ変更に合わせて
+  バージョンが分かれています (例: `elabapi-python` 5.4.x は eLabFTW 5.4.x向け)。
+- 本ツールの動作確認は `elabapi-python==5.6.0` (eLabFTW 5.6.x相当) で行っています。
+- **お使いのeLabFTWサーバーのバージョンに近い `elabapi-python` を pip でインストールしてください**
+  (例: `pip install elabapi-python==5.4.0`)。大きくバージョンがずれると、`Experiment`/`Step`等の
+  モデルのフィールド構成が変わり、`elabftw_client.py` の一部が動作しない可能性があります。
+
+## 必要なAPI権限
+
+- 本ツールは**読み取り専用**です (eLabFTWへの書き込み・更新は一切行いません)。
+- eLabFTWのAPIキーは「Read Only」権限で作成すれば十分です。
+- 変換対象の実験 (Experiments) に加え、その実験にリンクされたアイテム (Items、`ItemsApi.get_item`)
+  も読み取るため、**実験の閲覧権限に加えて、リンク先アイテムの閲覧権限**も必要です
+  (通常は同じチーム内であれば問題ありません)。
+- 添付ファイルはハッシュ値とダウンロードURLの参照のみ行い、ファイル本体はダウンロードしません。
+
+## APIキーの設定方法
+
+1. eLabFTWにログインし、右上のユーザーメニューから「設定 (Settings)」を開く
+2. 「API keys」タブで新規キーを発行 (権限は「Read Only」で問題ありません)
+3. 発行されたキーはこの時しか表示されないため、控えておく
+4. 環境変数、または`--api-key`引数で本ツールに渡す:
+   ```bash
+   export ELABFTW_HOST="https://elab.example.org/api/v2"
+   export ELABFTW_API_KEY="発行されたAPIキー"
+   ```
+   `elabftw/desktop` でローカル起動している場合は `--host https://localhost:PORT/api/v2` の
+   ように上書きしてください。
+
+## MaiMLへの変換対象
+
+現時点で変換されるのは以下のデータです (詳細は後述のマッピング設計を参照):
+
+| 変換する | 変換しない (対象外) |
+| --- | --- |
+| 実験のタイトル・作成日時・オーナー | 実験のステータス (Status)・カテゴリ (Category) |
+| 実験のStep一覧 (本文・完了日時) | チェックリストの `deadline` (締切日) |
+| 実験のExtra Fields (カスタムフィールド) | コメント (Comments) |
+| リンクされたアイテム (Items) とそのExtra Fields | 実験間リンク (Links to Experiments)・化合物リンク |
+| 実験本文・タグ | Todoリスト、通知、権限設定などのメタ情報 |
+| 添付ファイル (ハッシュ値付き参照。ファイル本体は埋め込まない) | |
+| 「使用装置」等のカスタムフィールドからのcreator/vendor/instrument | |
+
 
 ## 構成
 
@@ -25,7 +77,6 @@ elabftw2maiml/
   elabftw_client.py   elabapi-python でeLabFTWから取得 -> ExperimentDataへ変換
 elabftw_to_maiml.py    CLIエントリポイント
 test_build_and_validate.py  合成データでのビルド+XSD検証テスト
-schemas/               アップロードされたXSD一式のコピー (検証用)
 ```
 
 ## セットアップ
