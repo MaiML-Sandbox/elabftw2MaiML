@@ -24,8 +24,7 @@ elabftw2maiml/
   builder.py          ExperimentData -> <maiml> ルート要素の組み立て
   elabftw_client.py   elabapi-python でeLabFTWから取得 -> ExperimentDataへ変換
 elabftw_to_maiml.py    CLIエントリポイント
-test_build_and_validate.py  合成データでのビルド+XSD検証テスト
-schemas/               アップロードされたXSD一式のコピー (検証用)
+test_build_and_validate.py  合成データでのビルド+XSD検証テスト（実行する場合、schemas/が必要）
 ```
 
 ## セットアップ
