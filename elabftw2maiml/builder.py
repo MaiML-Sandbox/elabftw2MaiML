@@ -165,23 +165,26 @@ class MaimlBuilder:
         p_condition_in = "p_condition_in"
         p_result_out = "p_result_out"
 
+        steps = exp.steps or [Step(elab_id=0, title="measurement")]
+        n_steps = len(steps)
+
+        # PLACE -> STEP(transition) -> PLACE -> STEP(transition) -> ... -> PLACE
+        # (MaiMLのペトリネットはtransition同士を直接つなげず、必ず間にplaceを挟む)
         places = [
             mx.E("place", id=p_material_in),
             mx.E("place", id=p_condition_in),
-            mx.E("place", id=p_result_out),
         ]
-
-        steps = exp.steps or [Step(elab_id=0, title="measurement")]
-
         transitions = []
         arcs = []
         instructions = []
         step_instruction_ids: dict = {}
+        step_output_place: dict = {}  # step_key -> このSTEPの出力先place id (resultTemplateのplaceRefに使う)
 
-        prev_transition_id = None
         arc_n = 0
+        prev_output_place = None  # 直前のSTEPの出力place (次のSTEPの入力にもなる)
         for i, step in enumerate(steps):
-            t_id = f"t_step_{step.elab_id or i}"
+            step_key = step.elab_id if step.elab_id else i
+            t_id = f"t_step_{step_key}"
             transitions.append(mx.E("transition", id=t_id))
 
             if i == 0:
@@ -191,14 +194,22 @@ class MaimlBuilder:
                 arcs.append(mx.E("arc", id=f"a{arc_n}", source=p_condition_in, target=t_id))
             else:
                 arc_n += 1
-                arcs.append(mx.E("arc", id=f"a{arc_n}", source=prev_transition_id, target=t_id))
+                arcs.append(mx.E("arc", id=f"a{arc_n}", source=prev_output_place, target=t_id))
 
-            if i == len(steps) - 1:
-                arc_n += 1
-                arcs.append(mx.E("arc", id=f"a{arc_n}", source=t_id, target=p_result_out))
+            is_last = (i == n_steps - 1)
+            if is_last:
+                out_place = p_result_out
+            else:
+                out_place = f"p_mid_{step_key}"
+                places.append(mx.E("place", id=out_place))
+            arc_n += 1
+            arcs.append(mx.E("arc", id=f"a{arc_n}", source=t_id, target=out_place))
 
-            instr_id = f"instr_step_{step.elab_id or i}"
-            step_instruction_ids[step.elab_id if step.elab_id else i] = instr_id
+            step_output_place[step_key] = out_place
+            prev_output_place = out_place
+
+            instr_id = f"instr_step_{step_key}"
+            step_instruction_ids[step_key] = instr_id
             instr_uuid = new_uuid()
             instructions.append(mx.E(
                 "instruction",
@@ -206,7 +217,8 @@ class MaimlBuilder:
                 mx.ref_el("transitionRef", t_id, f"tref_{t_id}"),
                 id=instr_id,
             ))
-            prev_transition_id = t_id
+
+        places.append(mx.E("place", id=p_result_out))
 
         pnml_el = mx.E(
             "pnml",
@@ -283,7 +295,7 @@ class MaimlBuilder:
             content_children = mx.global_content(new_uuid(), properties=[_property_from_pv(p) for p in props])
 
             children = list(content_children)
-            children.append(mx.ref_el("placeRef", p_result_out, f"pref_res_{step_key}"))
+            children.append(mx.ref_el("placeRef", step_output_place[step_key], f"pref_res_{step_key}"))
             children.append(template_ref_el)
 
             result_templates.append(mx.E("resultTemplate", *children, id=tmpl_id))
