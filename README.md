@@ -7,6 +7,7 @@ eLabFTW (REST API v2 / `elabapi-python`) の実験データを、JIS K 0200 (Mai
 > eLabFTWおよびそのAPIはDeltablot社が開発するオープンソースソフトウェアであり、本ツールは
 > それを利用する第三者スクリプトです。Deltablot社による公認・サポートは受けていません。
 
+
 **実験データの入力は eLabFTW の GUI（ブラウザ / `elabftw/desktop`）で行い、本ツールはその結果を
 読み出して MaiML に変換するだけ**、という運用を想定しています（書き込みは行いません）。
 
