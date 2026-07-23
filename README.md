@@ -7,7 +7,6 @@ eLabFTW (REST API v2 / `elabapi-python`) の実験データを、JIS K 0200 (Mai
 > eLabFTWおよびそのAPIはDeltablot社が開発するオープンソースソフトウェアであり、本ツールは
 > それを利用する第三者スクリプトです。Deltablot社による公認・サポートは受けていません。
 
-
 **実験データの入力は eLabFTW の GUI（ブラウザ / `elabftw/desktop`）で行い、本ツールはその結果を
 読み出して MaiML に変換するだけ**、という運用を想定しています（書き込みは行いません）。
 
@@ -65,6 +64,15 @@ python3 test_build_and_validate.py
 | 添付ファイル (ハッシュ値付き参照。ファイル本体は埋め込まない) | |
 | 「使用装置」等のカスタムフィールドからのcreator/vendor/instrument | |
 
+## ライセンス
+
+本ツール自体のコード (このリポジトリ一式) は **MITライセンス**を想定しています
+(具体的な `LICENSE` ファイルは同梱していないため、実際に配布・公開する際はご組織の方針に
+合わせて追加してください)。
+
+同梱の `schemas/*.xsd` (MaiMLスキーマ定義ファイル) は、一般社団法人日本分析機器工業会が
+経済産業省委託事業の成果として作成したものであり、本ツールのライセンスとは別に、
+それぞれの `Readme.txt` / `Readme-ja.txt` に記載の利用条件に従います。
 
 ## 構成
 
@@ -76,7 +84,7 @@ elabftw2maiml/
   builder.py          ExperimentData -> <maiml> ルート要素の組み立て
   elabftw_client.py   elabapi-python でeLabFTWから取得 -> ExperimentDataへ変換
 elabftw_to_maiml.py    CLIエントリポイント
-test_build_and_validate.py  合成データでのビルド+XSD検証テスト
+test_build_and_validate.py  合成データでのビルド+XSD検証テスト（実行には"./schema/"が必要）
 ```
 
 ## セットアップ
@@ -95,6 +103,32 @@ python elabftw_to_maiml.py --experiment-id 123 --output experiment_123.maiml
 `--ns-prefix` / `--ns-uri` で、カスタムフィールドや試料情報のkey属性に使う名前空間を指定できます
 (例: `--ns-prefix mylab --ns-uri https://mylab.example.org/maiml`)。省略時は仮の名前空間になるので、
 実運用では必ず自組織の名前空間URIを指定してください。
+
+### コマンドライン引数一覧
+
+| 引数 | 必須 | 既定値 | 説明 |
+| --- | --- | --- | --- |
+| `--experiment-id` | **必須** | なし | 変換対象のeLabFTW実験ID (数値、1件のみ) |
+| `--output` / `-o` | **必須** | なし | 出力する `.maiml` ファイルのパス |
+| `--host` | 任意 | 環境変数 `ELABFTW_HOST` | eLabFTW APIのベースURL (例: `https://elab.example.org/api/v2`)。`--host`か環境変数のどちらかが必須 |
+| `--api-key` | 任意 | 環境変数 `ELABFTW_API_KEY` | eLabFTWのAPIキー。`--api-key`か環境変数のどちらかが必須 |
+| `--insecure` | 任意 (フラグ) | 無効 | TLS証明書検証を無効化 (自己署名証明書のローカル環境向け) |
+| `--ns-prefix` | 任意 | `ns1` | `property`/`content` の `key` 属性に使う名前空間プレフィックス |
+| `--ns-uri` | 任意 | `https://example.org/maiml/mylab` | `ns-prefix` に対応する名前空間URI (**実運用では必ず自組織のURIを指定**) |
+| `--creator-field` | 任意 (複数指定可) | 既定候補 (「使用装置」「Instrument」等) | `creator`(使用装置)として扱うカスタムフィールド名 |
+| `--vendor-field` | 任意 (複数指定可) | 既定候補 (「装置メーカー」「Vendor」等) | `vendor`(装置メーカー)として扱うカスタムフィールド名 |
+
+実質必須な組み合わせ:
+
+```bash
+python elabftw_to_maiml.py \
+    --experiment-id 123 \
+    --output out.maiml \
+    --host https://elab.example.org/api/v2 \
+    --api-key xxxxxxxxxxxx
+```
+
+(`--host`/`--api-key`は環境変数で渡せば省略可)
 
 ## マッピング設計 (eLabFTW -> MaiML)
 
