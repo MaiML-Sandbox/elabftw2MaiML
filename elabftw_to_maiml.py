@@ -44,16 +44,71 @@ def main() -> int:
     parser.add_argument("--vendor-field", action="append", default=None,
                          help="vendor(装置メーカー)として扱うカスタムフィールド名。複数指定可。"
                               "省略時は「装置メーカー」「Vendor」等の既定候補を使用")
+    parser.add_argument("--instrument-category", action="append", default=None,
+                         help="[非推奨・互換用] --role-category instrument=... と同じ")
+    parser.add_argument("--instrument-tag", action="append", default=None,
+                         help="[非推奨・互換用] --role-tag instrument=... と同じ")
+    parser.add_argument("--role-category", action="append", default=None, metavar="ROLE=VALUE",
+                         help="リンクされたアイテムをROLE (material/condition/result/creator/"
+                              "instrument/vendor) として扱うカテゴリ名。'ROLE=値' の形式で複数指定可"
+                              "(例: --role-category condition=測定条件 --role-category result=分析結果)。"
+                              "指定したROLEのみ既定候補を上書きし、他のROLEは既定候補のまま")
+    parser.add_argument("--role-tag", action="append", default=None, metavar="ROLE=VALUE",
+                         help="リンクされたアイテムをROLEとして扱うタグ名。'ROLE=値' の形式で複数指定可。"
+                              "指定方法は --role-category と同様")
+    parser.add_argument("--field-group", action="append", default=None, metavar="ROLE=VALUE",
+                         help="実験自身のカスタムフィールドを、eLabFTWの「フィールドグループ」機能"
+                              "(CUSTOM FIELDS内のMATERIAL/CONDITION/RESULTのような折りたたみグループ)の"
+                              "グループ名からROLE (material または result。conditionは既定のフォールバック"
+                              "先なので指定不要) に振り分けるための候補文字列。'ROLE=値' の形式で複数指定可"
+                              "(例: --field-group material=試料情報 --field-group result=解析結果)")
     args = parser.parse_args()
 
     if not args.host or not args.api_key:
         parser.error("--host/--api-key (または環境変数 ELABFTW_HOST/ELABFTW_API_KEY) が必要です")
+
+    def _parse_role_candidates(items, legacy_instrument_items):
+        """'ROLE=VALUE' 形式の引数リストを {role: [value, ...]} にまとめる。
+        [非推奨] --instrument-category/--instrument-tag もここでrole=instrumentとして合流させる。"""
+        result: dict = {}
+        for item in (items or []):
+            if "=" not in item:
+                parser.error(f"'{item}' は 'ROLE=値' の形式で指定してください (例: condition=測定条件)")
+            role, _, value = item.partition("=")
+            role = role.strip()
+            if role not in ("material", "condition", "result", "creator", "instrument", "vendor"):
+                parser.error(f"不明なROLE '{role}' です (material/condition/result/creator/"
+                              f"instrument/vendor のいずれかを指定してください)")
+            result.setdefault(role, []).append(value.strip())
+        for value in (legacy_instrument_items or []):
+            result.setdefault("instrument", []).append(value)
+        return result or None
+
+    def _parse_field_group_candidates(items):
+        result: dict = {}
+        for item in (items or []):
+            if "=" not in item:
+                parser.error(f"'{item}' は 'ROLE=値' の形式で指定してください (例: material=試料情報)")
+            role, _, value = item.partition("=")
+            role = role.strip()
+            if role not in ("material", "result"):
+                parser.error(f"--field-group で指定できるROLEは material/result のみです "
+                              f"(condition は既定のフォールバック先です): '{role}'")
+            result.setdefault(role, []).append(value.strip())
+        return result or None
+
+    role_category_candidates = _parse_role_candidates(args.role_category, args.instrument_category)
+    role_tag_candidates = _parse_role_candidates(args.role_tag, args.instrument_tag)
+    field_group_candidates = _parse_field_group_candidates(args.field_group)
 
     client = ElabftwClient(host_url=args.host, api_key=args.api_key, verify_ssl=not args.insecure)
     exp_data = client.fetch_experiment(
         args.experiment_id, ns_prefix=args.ns_prefix,
         creator_field_candidates=args.creator_field,
         vendor_field_candidates=args.vendor_field,
+        role_category_candidates=role_category_candidates,
+        role_tag_candidates=role_tag_candidates,
+        field_group_candidates=field_group_candidates,
     )
 
     builder = MaimlBuilder(ns_prefix=args.ns_prefix, ns_uri=args.ns_uri,

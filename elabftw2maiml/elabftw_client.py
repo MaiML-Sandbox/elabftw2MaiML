@@ -13,6 +13,7 @@ model.ExperimentData に変換する。
 from __future__ import annotations
 
 import html as html_module
+import json
 import re
 from datetime import datetime
 from typing import Optional
@@ -46,6 +47,35 @@ _EXTRA_FIELD_TYPE_MAP = {
 DEFAULT_CREATOR_FIELD_CANDIDATES = ["使用装置", "使用機器", "装置", "機器", "Instrument", "Equipment", "Device"]
 DEFAULT_VENDOR_FIELD_CANDIDATES = ["装置メーカー", "メーカー", "製造元", "Vendor", "Manufacturer"]
 
+# リンクされたアイテム (items_links) を、カテゴリ名・タグの文字列から
+# material/condition/result/creator/instrument/vendor のいずれの役割として扱うか判定する際の
+# 既定候補文字列 (大文字小文字を区別せず部分一致)。
+# 優先順位は _ROLE_PRIORITY の順 (先に一致した役割が採用される)。一致しなければ "material"。
+DEFAULT_ROLE_CATEGORY_CANDIDATES = {
+    "creator": ["Creator", "作成者", "使用装置", "使用機器"],
+    "vendor": ["Vendor", "メーカー", "製造元", "Manufacturer"],
+    "condition": ["Conditions", "Condition", "条件"],
+    "result": ["Results", "Result", "結果"],
+    "instrument": ["Resources", "Resource", "Equipment", "装置", "機器", "Instrument"],
+    "material": ["Consumables", "Samples", "Sample", "試料", "材料", "Material"],
+}
+DEFAULT_ROLE_TAG_CANDIDATES = {k: list(v) for k, v in DEFAULT_ROLE_CATEGORY_CANDIDATES.items()}
+# 一致判定を試みる順序 (material以外を先に判定し、どれにも当てはまらなければmaterial扱いにする)
+_ROLE_PRIORITY = ["creator", "vendor", "condition", "result", "instrument", "material"]
+
+# eLabFTWの「カスタムフィールドのグループ化」機能 (CUSTOM FIELDS > MATERIAL/CONDITION/... の
+# ように折りたたみグループを作れる機能) で使われるグループ名から、
+# material/condition/result のどの役割として扱うかを判定する際の既定候補
+# (大文字小文字を区別せず部分一致)。これはリンクされたアイテムのカテゴリ/タグ判定とは別の仕組みで、
+# 実験"自身"のカスタムフィールドに対して適用される。どれにも一致しないグループ (グループ無し含む)
+# のフィールドは既定で "condition" として扱う (従来の挙動と互換)。
+DEFAULT_FIELD_GROUP_CANDIDATES = {
+    "material": ["MATERIAL", "材料", "試料", "Sample"],
+    "result": ["RESULT", "RESULTS", "結果"],
+    # "condition" は明示候補を指定しなくても、どれにも一致しない場合のフォールバック先になる
+}
+_FIELD_GROUP_ROLE_PRIORITY = ["material", "result"]  # 先に一致した方が採用され、どちらにも該当しなければ"condition"
+
 _TAG_RE = re.compile(r"<[^>]+>")
 
 
@@ -69,6 +99,113 @@ def _parse_dt(value: Optional[str]) -> Optional[datetime]:
         except ValueError:
             continue
     return None
+
+
+def _normalize_extra_fields(metadata) -> dict:
+    """
+    eLabFTWの `metadata` は DB上はJSON文字列で保持されており、APIレスポンスでも
+    JSON文字列のまま返ってくることがある。`elabapi_python` はこれを自動的に
+    Metadataオブジェクトへ変換できない場合があり、その場合 `metadata.extra_fields`
+    へのアクセスがNoneになってしまう (=カスタムフィールド情報が一切拾えないバグの原因)。
+
+    この関数は、metadataが
+      - elabapi_python.Metadata オブジェクト (正しくパースされている場合)
+      - dict (JSONが辞書として渡ってくる場合)
+      - str (未パースのJSON文字列の場合)
+      - None
+    のいずれであっても、{field_name: {"type":..,"value":..,"description":..,"group_id":..}} という
+    通常のdictに正規化して返す。
+    """
+    if metadata is None:
+        return {}
+
+    # 1) 既に Metadata オブジェクトとして正しくパースされている場合
+    extra = getattr(metadata, "extra_fields", None)
+    if extra:
+        out = {}
+        for k, v in extra.items():
+            out[k] = {
+                "type": getattr(v, "type", None) if not isinstance(v, dict) else v.get("type"),
+                "value": getattr(v, "value", None) if not isinstance(v, dict) else v.get("value"),
+                "description": getattr(v, "description", None) if not isinstance(v, dict) else v.get("description"),
+                "group_id": getattr(v, "group_id", None) if not isinstance(v, dict) else v.get("group_id"),
+            }
+        return out
+
+    # 2) JSON文字列、またはパース済みdictの場合
+    raw = metadata
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except (ValueError, TypeError):
+            return {}
+    if isinstance(raw, dict):
+        return raw.get("extra_fields") or {}
+
+    return {}
+
+
+def _normalize_field_groups(metadata) -> dict:
+    """
+    eLabFTWの「カスタムフィールドのグループ化」機能で定義されたグループ一覧
+    (`metadata.elabftw.extra_fields_groups`、実体は [{"id":1,"name":"MATERIAL"}, ...]) を
+    {group_id: group_name} の辞書に正規化する。metadataの型ゆれ (オブジェクト/dict/JSON文字列/None)
+    は _normalize_extra_fields と同様に吸収する。
+    """
+    if metadata is None:
+        return {}
+
+    # 1) 既に Metadata オブジェクトとして正しくパースされている場合
+    elabftw_obj = getattr(metadata, "elabftw", None)
+    if elabftw_obj is not None:
+        groups = getattr(elabftw_obj, "extra_fields_groups", None) or []
+        out = {}
+        for g in groups:
+            gid = getattr(g, "id", None) if not isinstance(g, dict) else g.get("id")
+            name = getattr(g, "name", None) if not isinstance(g, dict) else g.get("name")
+            if gid is not None and name:
+                out[gid] = name
+        if out:
+            return out
+
+    # 2) JSON文字列、またはパース済みdictの場合
+    raw = metadata
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except (ValueError, TypeError):
+            return {}
+    if isinstance(raw, dict):
+        groups = (raw.get("elabftw") or {}).get("extra_fields_groups") or []
+        return {g.get("id"): g.get("name") for g in groups if g.get("id") is not None and g.get("name")}
+
+    return {}
+
+
+def _classify_field_group_role(group_name: Optional[str], field_group_candidates: dict) -> str:
+    """
+    グループ名の文字列から material/result のどちらかに該当するか判定する。
+    大文字小文字を区別せず部分一致。どちらにも該当しない (グループ無し含む) 場合は "condition"。
+    """
+    if group_name:
+        low = group_name.lower()
+        for role in _FIELD_GROUP_ROLE_PRIORITY:
+            candidates = field_group_candidates.get(role, [])
+            if any(c.lower() in low for c in candidates):
+                return role
+    return "condition"
+
+
+class _ExtraField:
+    """_normalize_extra_fields() が返す辞書の値 (dict) を、既存コードの
+    `field.type` / `field.value` / `field.description` という属性アクセスの
+    ままでも扱えるようにする薄いラッパー。"""
+
+    def __init__(self, d: dict):
+        self.type = d.get("type")
+        self.value = d.get("value")
+        self.description = d.get("description")
+        self.group_id = d.get("group_id")
 
 
 class ElabftwClient:
@@ -107,36 +244,80 @@ class ElabftwClient:
 
     def _extra_fields_to_properties(self, metadata, ns_prefix: str, exclude_names: Optional[set] = None) -> list:
         props = []
-        if metadata is None or not getattr(metadata, "extra_fields", None):
+        extra_fields = _normalize_extra_fields(metadata)
+        if not extra_fields:
             return props
         exclude_names = exclude_names or set()
-        for field_name, field in metadata.extra_fields.items():
+        for field_name, field_dict in extra_fields.items():
             if field_name in exclude_names:
                 continue
+            field = _ExtraField(field_dict)
             xsi_type = _EXTRA_FIELD_TYPE_MAP.get(field.type, "stringType")
             key = f"{ns_prefix}:{_sanitize_ncname(field_name)}"
             props.append(PropertyValue(
                 key=key,
                 xsi_type=xsi_type,
                 value=field.value,
-                description=getattr(field, "description", None) or None,
+                description=field.description or None,
             ))
         return props
+
+    def _split_extra_fields_by_group(self, metadata, ns_prefix: str,
+                                      exclude_names: Optional[set] = None,
+                                      field_group_candidates: Optional[dict] = None) -> dict:
+        """
+        実験"自身"のカスタムフィールドを、eLabFTWの「グループ化」機能 (CUSTOM FIELDS の中の
+        MATERIAL/CONDITION/RESULT のような折りたたみグループ) のグループ名から
+        material/condition/result に振り分ける。
+
+        戻り値: {"material": [PropertyValue, ...], "condition": [...], "result": [...]}
+
+        グループ名がどの候補にも一致しない場合 (グループ無しのフィールドも含む) は
+        "condition" として扱う (従来の挙動と互換)。
+        """
+        candidates = dict(DEFAULT_FIELD_GROUP_CANDIDATES)
+        if field_group_candidates:
+            candidates.update(field_group_candidates)
+        exclude_names = exclude_names or set()
+        result = {"material": [], "condition": [], "result": []}
+
+        extra_fields = _normalize_extra_fields(metadata)
+        if not extra_fields:
+            return result
+        group_names = _normalize_field_groups(metadata)
+
+        for field_name, field_dict in extra_fields.items():
+            if field_name in exclude_names:
+                continue
+            field = _ExtraField(field_dict)
+            group_name = group_names.get(field.group_id) if field.group_id is not None else None
+            role = _classify_field_group_role(group_name, candidates)
+
+            xsi_type = _EXTRA_FIELD_TYPE_MAP.get(field.type, "stringType")
+            key = f"{ns_prefix}:{_sanitize_ncname(field_name)}"
+            result[role].append(PropertyValue(
+                key=key,
+                xsi_type=xsi_type,
+                value=field.value,
+                description=field.description or None,
+            ))
+        return result
 
     def _find_field(self, metadata, candidates: list) -> tuple:
         """
         候補名リストのいずれかに(大文字小文字を区別せず)一致し、かつ値が入力されている
         カスタムフィールドを探す。見つかれば (実際のフィールド名, 値) を返す。
         """
-        if metadata is None or not getattr(metadata, "extra_fields", None):
+        extra_fields = _normalize_extra_fields(metadata)
+        if not extra_fields:
             return None, None
-        lower_map = {k.lower(): k for k in metadata.extra_fields.keys()}
+        lower_map = {k.lower(): k for k in extra_fields.keys()}
         for cand in candidates:
             actual_key = lower_map.get(cand.lower())
             if actual_key:
-                f = metadata.extra_fields[actual_key]
-                if f.value:
-                    return actual_key, f.value
+                value = extra_fields[actual_key].get("value")
+                if value:
+                    return actual_key, value
         return None, None
 
     def _creator_vendor_parties(self, metadata, creator_candidates: list,
@@ -168,23 +349,111 @@ class ElabftwClient:
             )
         return creator_party, vendor_party, used_fields
 
-    def _fetch_linked_materials(self, experiment, ns_prefix: str) -> list:
-        materials = []
-        for link in (experiment.items_links or []):
+    def _get_raw_json(self, resource_path: str) -> Optional[dict]:
+        """
+        swagger-codegen (elabapi-python) の自動デシリアライズを経由せず、
+        生のJSONレスポンスをそのまま取得する。
+
+        `elabapi_python.ApiClient.__deserialize_model` は、値が dict/list でない場合
+        (=metadataがJSON文字列のまま返ってきた場合) その値を静かに捨てて空のオブジェクトを
+        作ってしまうため、SDK経由で取得した `experiment.metadata` / `item.metadata` は
+        実質的に空になってしまう。metadataだけはこの生JSON取得で確実に読み取る。
+        """
+        try:
+            response = self.api_client.call_api(
+                resource_path, "GET",
+                header_params={"Accept": "application/json"},
+                auth_settings=["token"],
+                _preload_content=False,
+                _return_http_data_only=True,
+            )
+            return json.loads(response.data)
+        except ApiException as e:
+            print(f"  [警告] {resource_path} の取得に失敗しました: {e}")
+            return None
+        except (ValueError, TypeError) as e:
+            print(f"  [警告] {resource_path} のJSON解析に失敗しました: {e}")
+            return None
+
+    def _classify_role(self, category_title: Optional[str], tags: Optional[str],
+                        category_candidates: dict, tag_candidates: dict) -> str:
+        """
+        リンクされたアイテムのカテゴリ名・タグ文字列から、material/condition/result/
+        creator/instrument/vendor のどの役割として扱うかを判定する。
+        大文字小文字を区別せず部分一致で判定し、_ROLE_PRIORITY の順に調べる。
+        どれにも該当しなければ "material" とみなす (従来の既定動作と互換)。
+        """
+        haystacks = []
+        if category_title:
+            haystacks.append(category_title.lower())
+        if tags:
+            haystacks.extend(t.strip().lower() for t in re.split(r"[,|]", tags) if t.strip())
+
+        for role in _ROLE_PRIORITY:
+            if role == "material":
+                continue  # materialは最後にフォールバックとして扱う
+            cat_cands = category_candidates.get(role, [])
+            tag_cands = tag_candidates.get(role, [])
+            for h in haystacks:
+                if any(c.lower() in h for c in cat_cands) or any(c.lower() in h for c in tag_cands):
+                    return role
+        return "material"
+
+    def _fetch_linked_items(self, experiment, ns_prefix: str,
+                             role_category_candidates: Optional[dict] = None,
+                             role_tag_candidates: Optional[dict] = None) -> dict:
+        """
+        戻り値: {"material": [LinkedItem, ...],
+                 "condition": [(link, raw_item, props), ...],
+                 "result": [(link, raw_item, props), ...],
+                 "creator": [(link, raw_item), ...],
+                 "instrument": [(link, raw_item), ...],
+                 "vendor": [(link, raw_item), ...]}
+
+        リンクされたアイテム (items_links) 1件ごとに、カテゴリ名/タグから役割を判定し、
+        対応するバケツに振り分ける。material以外は、呼び出し側 (fetch_experiment) で
+        condition/result/creator/vendor/instrumentの情報源として使う。
+        """
+        category_candidates = dict(DEFAULT_ROLE_CATEGORY_CANDIDATES)
+        if role_category_candidates:
+            category_candidates.update(role_category_candidates)
+        tag_candidates = dict(DEFAULT_ROLE_TAG_CANDIDATES)
+        if role_tag_candidates:
+            tag_candidates.update(role_tag_candidates)
+
+        buckets = {"material": [], "condition": [], "result": [], "creator": [], "instrument": [], "vendor": []}
+        links = experiment.items_links or []
+        if not links:
+            print("  [警告] 実験にリンクされたアイテム (items_links) が見つかりません。"
+                  "eLabFTW側で試料・機器等をリンクしていない場合は正常です。")
+        for link in links:
+            raw_item = self._get_raw_json(f"/items/{link.entityid}")
             item_props = []
-            try:
-                item = self.items_api.get_item(link.entityid)
-                item_props = self._extra_fields_to_properties(item.metadata, ns_prefix)
-            except ApiException:
-                # アイテム詳細が取れなくてもタイトルだけで材料インスタンスを作る
-                pass
-            materials.append(LinkedItem(
-                elab_id=link.entityid,
-                title=link.title,
-                category=getattr(link, "category_title", None),
-                properties=item_props,
-            ))
-        return materials
+            raw_tags = None
+            if raw_item is not None:
+                item_props = self._extra_fields_to_properties(raw_item.get("metadata"), ns_prefix)
+                raw_tags = raw_item.get("tags")
+
+            category_title = getattr(link, "category_title", None)
+            role = self._classify_role(category_title, raw_tags, category_candidates, tag_candidates)
+            print(f"  [情報] リンクされたアイテム #{link.entityid} ({link.title}) を"
+                  f"'{role}' として扱います (category={category_title!r}, tags={raw_tags!r})")
+
+            if role == "material":
+                if raw_item is not None and not item_props:
+                    print(f"  [情報] リンクされたアイテム #{link.entityid} ({link.title}) に"
+                          f"カスタムフィールドが見つかりませんでした。")
+                buckets["material"].append(LinkedItem(
+                    elab_id=link.entityid,
+                    title=link.title,
+                    category=category_title,
+                    properties=item_props,
+                ))
+            elif role in ("condition", "result"):
+                buckets[role].append((link, raw_item, item_props))
+            else:  # creator / vendor / instrument
+                buckets[role].append((link, raw_item))
+        return buckets
 
     def _fetch_uploads(self, experiment) -> list:
         files = []
@@ -216,39 +485,131 @@ class ElabftwClient:
 
     def fetch_experiment(self, experiment_id: int, ns_prefix: str = "ns1",
                           creator_field_candidates: Optional[list] = None,
-                          vendor_field_candidates: Optional[list] = None) -> ExperimentData:
+                          vendor_field_candidates: Optional[list] = None,
+                          role_category_candidates: Optional[dict] = None,
+                          role_tag_candidates: Optional[dict] = None,
+                          field_group_candidates: Optional[dict] = None) -> ExperimentData:
         """
         creator_field_candidates / vendor_field_candidates:
             「使用装置」「装置メーカー」等、実験のカスタムフィールドからcreator/vendorを
             拾い上げる際に探すフィールド名の候補リスト (大文字小文字を区別せずマッチ)。
             省略時は DEFAULT_CREATOR_FIELD_CANDIDATES / DEFAULT_VENDOR_FIELD_CANDIDATES を使う。
-            該当フィールドが無い/未入力の場合は、creator=このツール自身 / vendor=Deltablot に
-            フォールバックする (builder.py 側の既定動作)。
+        role_category_candidates / role_tag_candidates:
+            リンクされたアイテムを material/condition/result/creator/instrument/vendor の
+            どの役割として扱うかを、カテゴリ名・タグの文字列から判定するための候補辞書
+            ({role: [候補文字列, ...]})。省略時は DEFAULT_ROLE_CATEGORY_CANDIDATES /
+            DEFAULT_ROLE_TAG_CANDIDATES を使う。
+        field_group_candidates:
+            実験"自身"のカスタムフィールドを、eLabFTWの「フィールドグループ」機能
+            (CUSTOM FIELDS の中の MATERIAL/CONDITION/RESULT のような折りたたみグループ) の
+            グループ名から material/condition/result のどれに振り分けるかの候補辞書
+            ({role: [候補文字列, ...]}, role は "material"/"result" のみ指定可。
+            "condition" はどれにも一致しない場合のフォールバック先として自動的に使われる)。
+            省略時は DEFAULT_FIELD_GROUP_CANDIDATES を使う。
+
+        creator/vendor/instrumentの決定優先順位:
+            1. カテゴリ/タグから明示的に creator/vendor/instrument と判定されたリンクアイテム
+            2. 実験のカスタムフィールド (--creator-field/--vendor-field) (creator/vendorのみ)
+            3. カテゴリ/タグから "instrument" と判定されたリンクアイテムをcreatorのフォールバックに使う
+               (そのアイテム自身のカスタムフィールドからvendorも探す)
+            4. どれも無い場合、このツール自身 / Deltablot にフォールバック (builder.py側)
+
+        condition/resultの決定:
+            実験のExtra Fields (condition) / 実験本文・タグ (result) に加え、
+            カテゴリ/タグから "condition"/"result" と判定されたリンクアイテムの
+            カスタムフィールドも、それぞれconditionTemplate/resultTemplateにマージする。
         """
         experiment = self.experiments_api.get_experiment(experiment_id)
+        raw_experiment = self._get_raw_json(f"/experiments/{experiment_id}")
+        raw_metadata = raw_experiment.get("metadata") if raw_experiment else None
+
+        creator_field_candidates = creator_field_candidates or DEFAULT_CREATOR_FIELD_CANDIDATES
+        vendor_field_candidates = vendor_field_candidates or DEFAULT_VENDOR_FIELD_CANDIDATES
 
         owner = self._owner_party(experiment.userid, experiment.fullname)
         steps = self._steps_to_model(experiment)
-        materials = self._fetch_linked_materials(experiment, ns_prefix)
+        buckets = self._fetch_linked_items(
+            experiment, ns_prefix, role_category_candidates, role_tag_candidates)
+        materials = buckets["material"]
 
-        creator_party, vendor_party, used_fields = self._creator_vendor_parties(
-            experiment.metadata,
-            creator_field_candidates or DEFAULT_CREATOR_FIELD_CANDIDATES,
-            vendor_field_candidates or DEFAULT_VENDOR_FIELD_CANDIDATES,
-        )
+        # -- creator/vendor: 1) 明示的にタグ/カテゴリ付けされたリンクアイテムを最優先 --------
+        creator_party = None
+        vendor_party = None
+        if buckets["creator"]:
+            link, _raw = buckets["creator"][0]
+            creator_party = Party(key=f"elabftw-device:{link.title}", name=link.title)
+        if buckets["vendor"]:
+            link, _raw = buckets["vendor"][0]
+            vendor_party = Party(key=f"elabftw-device-vendor:{link.title}", name=link.title)
+
+        # -- 2) 実験のカスタムフィールド (まだ決まっていない方のみ採用) --------------------
+        cf_creator_party, cf_vendor_party, used_fields = self._creator_vendor_parties(
+            raw_metadata, creator_field_candidates, vendor_field_candidates)
+        if creator_party is None:
+            creator_party = cf_creator_party
+        if vendor_party is None:
+            vendor_party = cf_vendor_party
+
+        # -- 3) "instrument" と判定されたリンクアイテムをcreatorのフォールバックに使う -----
+        if creator_party is None and buckets["instrument"]:
+            link, raw_item = buckets["instrument"][0]
+            creator_party = Party(key=f"elabftw-device:{link.title}", name=link.title)
+            if vendor_party is None:
+                item_metadata = raw_item.get("metadata") if raw_item else None
+                _, vendor_value = self._find_field(item_metadata, vendor_field_candidates)
+                if vendor_value:
+                    vendor_party = Party(key=f"elabftw-device-vendor:{vendor_value.strip()}",
+                                          name=vendor_value.strip())
+
+        if creator_party is not None and vendor_party is None:
+            vendor_party = Party(
+                key=f"elabftw-device-vendor-unknown:{creator_party.name}",
+                name=f"(unspecified vendor of {creator_party.name})",
+            )
+
+        # -- instrument: "instrument" と判定されたリンクアイテムを優先、無ければcreator名を流用 --
         instrument_party = None
-        if creator_party is not None:
-            # 一般名(instrument)と個体(creator)を同じ表示名から作る簡易実装。
-            # 型式とシリアル番号を別フィールドで分けて管理したい場合は、
-            # creator_party/instrument_partyの生成ロジックをここで分離してください。
+        if buckets["instrument"]:
+            link, _raw = buckets["instrument"][0]
+            instrument_party = Party(key=f"elabftw-instrument:{link.title}", name=link.title)
+        elif creator_party is not None:
             instrument_party = Party(key=f"elabftw-instrument:{creator_party.name}", name=creator_party.name)
 
-        condition_props = self._extra_fields_to_properties(
-            experiment.metadata, ns_prefix, exclude_names=used_fields)
+        # -- 実験"自身"のカスタムフィールドを、eLabFTWのグループ化機能 (MATERIAL/CONDITION/RESULT
+        #    のような折りたたみグループ) のグループ名から material/condition/result に振り分ける。
+        #    グループ無し、またはどの候補にも一致しないグループのフィールドは "condition" 扱い。
+        own_fields = self._split_extra_fields_by_group(
+            raw_metadata, ns_prefix, exclude_names=used_fields,
+            field_group_candidates=field_group_candidates,
+        )
+
+        # -- material: リンクアイテム由来のmaterialsに加え、MATERIALグループの自己カスタムフィールド
+        #    があれば、実験自身を表す合成LinkedItemとしてmaterialsに追加する ---------------------
+        if own_fields["material"]:
+            materials = list(materials) + [LinkedItem(
+                elab_id=0,
+                title=experiment.title,
+                category="(experiment own MATERIAL fields)",
+                properties=own_fields["material"],
+            )]
+
+        # -- condition: 実験のExtra Fields (CONDITIONグループ/グループ無し)
+        #    + "condition"と判定されたリンクアイテム ------------------------------------------
+        condition_props = list(own_fields["condition"])
+        for link, raw_item, item_props in buckets["condition"]:
+            if not item_props:
+                print(f"  [情報] 条件として扱われたリンクアイテム #{link.entityid} ({link.title}) に"
+                      f"カスタムフィールドが見つかりませんでした。")
+            condition_props.extend(item_props)
+        if not condition_props:
+            print("  [情報] 実験のカスタムフィールド (Extra Fields) が見つかりませんでした。"
+                  "eLabFTW側でカスタムフィールドを設定していない場合は正常です。")
 
         uploads = self._fetch_uploads(experiment)
         body_text = _strip_html(experiment.body)
 
+        # -- result: 実験本文・タグ + RESULTグループの自己カスタムフィールド
+        #    + "result"と判定されたリンクアイテム --------------------------------------------
         result_props = []
         if body_text:
             result_props.append(PropertyValue(
@@ -262,6 +623,14 @@ class ElabftwClient:
                 xsi_type="stringType",
                 value=experiment.tags,
             ))
+        result_props.extend(own_fields["result"])
+        for link, raw_item, item_props in buckets["result"]:
+            result_props.append(PropertyValue(
+                key=f"{ns_prefix}:resultItem",
+                xsi_type="stringType",
+                value=link.title,
+            ))
+            result_props.extend(item_props)
 
         exp_date = _parse_dt(getattr(experiment, "_date", None) or experiment.created_at) \
             or datetime.utcnow()
