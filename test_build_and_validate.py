@@ -67,7 +67,7 @@ exp2 = ExperimentData(
     owner=Party(key="elabftw-user-7@elab.example.org", name="Suzuki Hanako"),
     creator=_Party(key="elabftw-device:FT-IR IRAffinity-1S", name="FT-IR IRAffinity-1S"),
     vendor=_Party(key="elabftw-device-vendor:Shimadzu", name="Shimadzu"),
-    instrument=_Party(key="elabftw-instrument:FT-IR IRAffinity-1S", name="FT-IR IRAffinity-1S"),
+    instruments=[_Party(key="elabftw-instrument:FT-IR IRAffinity-1S", name="FT-IR IRAffinity-1S")],
     steps=[Step(elab_id=601, title="秤量", finished_at=datetime(2026, 7, 21, 9, 5, tzinfo=timezone.utc),
                 is_finished=True)],
 )

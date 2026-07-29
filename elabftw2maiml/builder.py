@@ -110,20 +110,20 @@ class MaimlBuilder:
             id="vendor_of_creator",
         )
 
-        instrument_el = None
-        instrument_ref_el = None
-        if exp.instrument is not None:
-            instrument_uuid = named_uuid(exp.instrument.key)
-            instrument_el = mx.E(
+        instrument_els = []
+        instrument_ref_els = []
+        for idx, instrument_party in enumerate(exp.instruments):
+            instrument_uuid = named_uuid(instrument_party.key)
+            instrument_id = f"instrument_{idx + 1}"
+            instrument_els.append(mx.E(
                 "instrument",
-                *mx.global_content(instrument_uuid, description=exp.instrument.name),
-                id="instrument_general",
-            )
-            instrument_ref_el = mx.ref_el("instrumentRef", "instrument_general", "iref_creator")
+                *mx.global_content(instrument_uuid, description=instrument_party.name),
+                id=instrument_id,
+            ))
+            instrument_ref_els.append(mx.ref_el("instrumentRef", instrument_id, f"iref_creator_{idx + 1}"))
 
         creator_children = [mx.ref_el("vendorRef", "vendor_of_creator", "vref_creator")]
-        if instrument_ref_el is not None:
-            creator_children.append(instrument_ref_el)
+        creator_children.extend(instrument_ref_els)
 
         creator_el = mx.E(
             "creator",
@@ -142,9 +142,7 @@ class MaimlBuilder:
 
         doc_uuid = new_uuid()
         doc_children = mx.global_content(doc_uuid, description=exp.title)
-        document_children = [creator_el, vendor_el, owner_el]
-        if instrument_el is not None:
-            document_children.append(instrument_el)
+        document_children = [creator_el, vendor_el, owner_el, *instrument_els]
         return mx.E(
             "document",
             *doc_children,

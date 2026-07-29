@@ -72,7 +72,7 @@ class ExperimentData:
     owner: Optional[Party] = None            # 実験の所有者/実施者
     creator: Optional[Party] = None          # 計測装置/ソフトウェア (カスタムフィールド由来。無指定ならツール自身にフォールバック)
     vendor: Optional[Party] = None           # creatorの製造元 (カスタムフィールド由来。無指定ならDeltablotにフォールバック)
-    instrument: Optional[Party] = None       # 装置の一般名/型式 (カスタムフィールド由来。任意)
+    instruments: list = field(default_factory=list)    # list[Party] 装置の一般名/型式 (複数可。任意)
     steps: list = field(default_factory=list)          # list[Step]
     materials: list = field(default_factory=list)      # list[LinkedItem]
     condition_properties: list = field(default_factory=list)  # list[PropertyValue] (カスタムフィールド由来)

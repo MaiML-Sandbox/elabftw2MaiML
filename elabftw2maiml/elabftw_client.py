@@ -16,6 +16,7 @@ import html as html_module
 import json
 import re
 from datetime import datetime
+from types import SimpleNamespace
 from typing import Optional
 
 import elabapi_python
@@ -401,7 +402,8 @@ class ElabftwClient:
 
     def _fetch_linked_items(self, experiment, ns_prefix: str,
                              role_category_candidates: Optional[dict] = None,
-                             role_tag_candidates: Optional[dict] = None) -> dict:
+                             role_tag_candidates: Optional[dict] = None,
+                             max_depth: int = 2) -> dict:
         """
         戻り値: {"material": [LinkedItem, ...],
                  "condition": [(link, raw_item, props), ...],
@@ -413,6 +415,11 @@ class ElabftwClient:
         リンクされたアイテム (items_links) 1件ごとに、カテゴリ名/タグから役割を判定し、
         対応するバケツに振り分ける。material以外は、呼び出し側 (fetch_experiment) で
         condition/result/creator/vendor/instrumentの情報源として使う。
+
+        さらに、リンクされたアイテム自身が別のアイテムにリンクしている場合 (例: 装置アイテムに
+        検出器アイテムがリンクされている等)、そのネストしたリンク先も再帰的に同じ規則で
+        振り分ける (max_depth階層まで)。同じアイテムを2度たどらないよう訪問済みIDを記録し、
+        循環参照があっても無限ループにならないようにしている。
         """
         category_candidates = dict(DEFAULT_ROLE_CATEGORY_CANDIDATES)
         if role_category_candidates:
@@ -422,37 +429,63 @@ class ElabftwClient:
             tag_candidates.update(role_tag_candidates)
 
         buckets = {"material": [], "condition": [], "result": [], "creator": [], "instrument": [], "vendor": []}
-        links = experiment.items_links or []
-        if not links:
+        visited: set = set()
+
+        def process_links(links, depth: int, parent_title: Optional[str] = None):
+            for link in links:
+                entityid = link.entityid
+                if entityid in visited:
+                    continue  # 循環参照/重複リンク対策
+                visited.add(entityid)
+
+                raw_item = self._get_raw_json(f"/items/{entityid}")
+                item_props = []
+                raw_tags = None
+                if raw_item is not None:
+                    item_props = self._extra_fields_to_properties(raw_item.get("metadata"), ns_prefix)
+                    raw_tags = raw_item.get("tags")
+
+                category_title = getattr(link, "category_title", None)
+                role = self._classify_role(category_title, raw_tags, category_candidates, tag_candidates)
+                indent = "  " * (depth + 1)
+                origin = f" (#{parent_title}にリンクされたリソース)" if parent_title else ""
+                print(f"{indent}[情報] リンクされたアイテム #{entityid} ({link.title}){origin} を"
+                      f"'{role}' として扱います (category={category_title!r}, tags={raw_tags!r})")
+
+                if role == "material":
+                    if raw_item is not None and not item_props:
+                        print(f"{indent}[情報] リンクされたアイテム #{entityid} ({link.title}) に"
+                              f"カスタムフィールドが見つかりませんでした。")
+                    buckets["material"].append(LinkedItem(
+                        elab_id=entityid,
+                        title=link.title,
+                        category=category_title,
+                        properties=item_props,
+                    ))
+                elif role in ("condition", "result"):
+                    buckets[role].append((link, raw_item, item_props))
+                else:  # creator / vendor / instrument
+                    buckets[role].append((link, raw_item))
+
+                # -- 再帰: このアイテム自身がリンクしている別アイテムも同様に処理する ----------
+                if raw_item is not None and depth + 1 < max_depth:
+                    nested_raw_links = raw_item.get("items_links") or []
+                    nested_links = [
+                        SimpleNamespace(
+                            entityid=nl.get("entityid"),
+                            title=nl.get("title"),
+                            category_title=nl.get("category_title"),
+                        )
+                        for nl in nested_raw_links if nl.get("entityid") is not None
+                    ]
+                    if nested_links:
+                        process_links(nested_links, depth + 1, parent_title=link.title)
+
+        top_links = experiment.items_links or []
+        if not top_links:
             print("  [警告] 実験にリンクされたアイテム (items_links) が見つかりません。"
                   "eLabFTW側で試料・機器等をリンクしていない場合は正常です。")
-        for link in links:
-            raw_item = self._get_raw_json(f"/items/{link.entityid}")
-            item_props = []
-            raw_tags = None
-            if raw_item is not None:
-                item_props = self._extra_fields_to_properties(raw_item.get("metadata"), ns_prefix)
-                raw_tags = raw_item.get("tags")
-
-            category_title = getattr(link, "category_title", None)
-            role = self._classify_role(category_title, raw_tags, category_candidates, tag_candidates)
-            print(f"  [情報] リンクされたアイテム #{link.entityid} ({link.title}) を"
-                  f"'{role}' として扱います (category={category_title!r}, tags={raw_tags!r})")
-
-            if role == "material":
-                if raw_item is not None and not item_props:
-                    print(f"  [情報] リンクされたアイテム #{link.entityid} ({link.title}) に"
-                          f"カスタムフィールドが見つかりませんでした。")
-                buckets["material"].append(LinkedItem(
-                    elab_id=link.entityid,
-                    title=link.title,
-                    category=category_title,
-                    properties=item_props,
-                ))
-            elif role in ("condition", "result"):
-                buckets[role].append((link, raw_item, item_props))
-            else:  # creator / vendor / instrument
-                buckets[role].append((link, raw_item))
+        process_links(top_links, depth=0)
         return buckets
 
     def _fetch_uploads(self, experiment) -> list:
@@ -488,8 +521,13 @@ class ElabftwClient:
                           vendor_field_candidates: Optional[list] = None,
                           role_category_candidates: Optional[dict] = None,
                           role_tag_candidates: Optional[dict] = None,
-                          field_group_candidates: Optional[dict] = None) -> ExperimentData:
+                          field_group_candidates: Optional[dict] = None,
+                          link_depth: int = 2) -> ExperimentData:
         """
+        link_depth:
+            リンクされたアイテムをどこまで再帰的にたどるか。1なら実験に直接リンクされた
+            アイテムのみ、2なら「実験→アイテムA→アイテムAにリンクされたアイテムB」まで
+            (既定値)。アイテム同士の循環参照があっても無限ループにはならない。
         creator_field_candidates / vendor_field_candidates:
             「使用装置」「装置メーカー」等、実験のカスタムフィールドからcreator/vendorを
             拾い上げる際に探すフィールド名の候補リスト (大文字小文字を区別せずマッチ)。
@@ -529,7 +567,7 @@ class ElabftwClient:
         owner = self._owner_party(experiment.userid, experiment.fullname)
         steps = self._steps_to_model(experiment)
         buckets = self._fetch_linked_items(
-            experiment, ns_prefix, role_category_candidates, role_tag_candidates)
+            experiment, ns_prefix, role_category_candidates, role_tag_candidates, max_depth=link_depth)
         materials = buckets["material"]
 
         # -- creator/vendor: 1) 明示的にタグ/カテゴリ付けされたリンクアイテムを最優先 --------
@@ -567,13 +605,17 @@ class ElabftwClient:
                 name=f"(unspecified vendor of {creator_party.name})",
             )
 
-        # -- instrument: "instrument" と判定されたリンクアイテムを優先、無ければcreator名を流用 --
-        instrument_party = None
-        if buckets["instrument"]:
-            link, _raw = buckets["instrument"][0]
-            instrument_party = Party(key=f"elabftw-instrument:{link.title}", name=link.title)
-        elif creator_party is not None:
-            instrument_party = Party(key=f"elabftw-instrument:{creator_party.name}", name=creator_party.name)
+        # -- instrument: "instrument" と判定されたリンクアイテム全て (ネストしたリンク先も含む) を
+        #    それぞれ独立した <instrument> として反映する。無ければcreator名を流用する。
+        instrument_parties = []
+        seen_instrument_titles = set()
+        for link, _raw in buckets["instrument"]:
+            if link.title in seen_instrument_titles:
+                continue
+            seen_instrument_titles.add(link.title)
+            instrument_parties.append(Party(key=f"elabftw-instrument:{link.title}", name=link.title))
+        if not instrument_parties and creator_party is not None:
+            instrument_parties.append(Party(key=f"elabftw-instrument:{creator_party.name}", name=creator_party.name))
 
         # -- 実験"自身"のカスタムフィールドを、eLabFTWのグループ化機能 (MATERIAL/CONDITION/RESULT
         #    のような折りたたみグループ) のグループ名から material/condition/result に振り分ける。
@@ -643,7 +685,7 @@ class ElabftwClient:
             owner=owner,
             creator=creator_party,
             vendor=vendor_party,
-            instrument=instrument_party,
+            instruments=instrument_parties,
             steps=steps,
             materials=materials,
             condition_properties=condition_props,

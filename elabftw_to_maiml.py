@@ -62,6 +62,10 @@ def main() -> int:
                               "グループ名からROLE (material または result。conditionは既定のフォールバック"
                               "先なので指定不要) に振り分けるための候補文字列。'ROLE=値' の形式で複数指定可"
                               "(例: --field-group material=試料情報 --field-group result=解析結果)")
+    parser.add_argument("--link-depth", type=int, default=2,
+                         help="リンクされたアイテムをどこまで再帰的にたどるか (既定値: 2)。"
+                              "1なら実験に直接リンクされたアイテムのみ、2なら「アイテムがさらに"
+                              "リンクしている別アイテム」まで辿る。循環参照があっても無限ループにはならない")
     args = parser.parse_args()
 
     if not args.host or not args.api_key:
@@ -109,6 +113,7 @@ def main() -> int:
         role_category_candidates=role_category_candidates,
         role_tag_candidates=role_tag_candidates,
         field_group_candidates=field_group_candidates,
+        link_depth=args.link_depth,
     )
 
     builder = MaimlBuilder(ns_prefix=args.ns_prefix, ns_uri=args.ns_uri,
