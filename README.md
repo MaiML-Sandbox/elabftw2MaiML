@@ -109,6 +109,11 @@ python elabftw_to_maiml.py --experiment-id 123 --output experiment_123.maiml
 | `--ns-uri` | 任意 | `https://example.org/maiml/mylab` | `ns-prefix` に対応する名前空間URI (**実運用では必ず自組織のURIを指定**) |
 | `--creator-field` | 任意 (複数指定可) | 既定候補 (「使用装置」「Instrument」等) | `creator`(使用装置)として扱うカスタムフィールド名 |
 | `--vendor-field` | 任意 (複数指定可) | 既定候補 (「装置メーカー」「Vendor」等) | `vendor`(装置メーカー)として扱うカスタムフィールド名 |
+| `--role-category` | 任意 (`ROLE=値` 形式、複数指定可) | 既定候補 (役割ごと。下記参照) | リンクされたアイテムをROLE (material/condition/result/creator/instrument/vendor) として扱うカテゴリ名 |
+| `--role-tag` | 任意 (`ROLE=値` 形式、複数指定可) | 既定候補 (役割ごと。下記参照) | リンクされたアイテムをROLEとして扱うタグ名 |
+| `--field-group` | 任意 (`ROLE=値` 形式、`material`/`result`のみ、複数指定可) | 既定候補 (「MATERIAL」「RESULT」等) | 実験自身のカスタムフィールドグループ名からROLEへ振り分け |
+| `--instrument-category` | 任意 (複数指定可、非推奨) | 既定候補 (「Resources」「装置」等) | `--role-category instrument=...`と同じ (互換用) |
+| `--instrument-tag` | 任意 (複数指定可、非推奨) | 既定候補 (「Resources」「装置」等) | `--role-tag instrument=...`と同じ (互換用) |
 
 実質必須な組み合わせ:
 
@@ -183,6 +188,74 @@ python elabftw_to_maiml.py --experiment-id 123 --output out.maiml \
 シリアル番号を含めて入力する運用にするか、`elabftw_client.py` の `_creator_vendor_parties` を
 拡張してください。
 
+### リンクされたアイテムの役割判定 (material/condition/result/creator/instrument/vendor)
+
+eLabFTWでは試料も装置もカスタムデータも、同じ「Items」データベースでカテゴリ違いとして
+管理されているため、実験にリンクされたアイテムを何も考えずに全て`materialTemplate`/`material`に
+変換すると、リンクした顕微鏡・分析装置なども「試料」として出力されてしまいます。
+
+これを避けるため、リンクされたアイテムの**カテゴリ名**または**タグ**が下記の候補文字列に
+(大文字小文字を区別せず部分一致で) 該当する場合、そのアイテムを対応する役割として扱います。
+どれにも該当しなければ既定で `material` として扱われます (従来の挙動と互換)。
+
+| 役割 | 既定候補文字列 (カテゴリ名・タグ共通) | 反映先 |
+| --- | --- | --- |
+| `creator` | `Creator`, `作成者`, `使用装置`, `使用機器` | `document/creator` (アイテムのタイトルを使用) |
+| `vendor` | `Vendor`, `メーカー`, `製造元`, `Manufacturer` | `document/vendor` (アイテムのタイトルを使用) |
+| `condition` | `Conditions`, `Condition`, `条件` | `conditionTemplate`/`condition` (アイテムのカスタムフィールドをマージ) |
+| `result` | `Results`, `Result`, `結果` | 最後のSTEPの`resultTemplate`/`result` (アイテム名+カスタムフィールドを追加) |
+| `instrument` | `Resources`, `Resource`, `Equipment`, `装置`, `機器`, `Instrument` | `document/instrument`、creator/vendor未指定時のフォールバック |
+| `material` (既定/フォールバック) | `Consumables`, `Samples`, `Sample`, `試料`, `材料`, `Material` | `materialTemplate`/`material` |
+
+判定の優先順位は上記表の上から順（`creator`→`vendor`→`condition`→`result`→`instrument`→`material`）で、
+最初に一致した役割が採用されます。
+
+自組織のカテゴリ名/タグがこれと異なる場合は、CLIの `--role-category` / `--role-tag`
+(`ROLE=値` の形式、複数指定可) で役割ごとに上書きできます。指定したROLEのみ既定候補が
+置き換わり、他のROLEは既定候補のまま残ります:
+
+```bash
+python elabftw_to_maiml.py --experiment-id 123 --output out.maiml \
+    --role-category condition="測定条件" \
+    --role-category result="分析結果" \
+    --role-tag instrument="装置"
+```
+
+（`--instrument-category`/`--instrument-tag`は互換性のために残していますが、`--role-category
+instrument=...`と同じ意味なので、新規には`--role-category`/`--role-tag`の使用を推奨します）
+
+**creator/vendor/instrumentの決定優先順位**:
+1. カテゴリ/タグから明示的に`creator`/`vendor`と判定されたリンクアイテム
+2. 実験のカスタムフィールド (`--creator-field`/`--vendor-field`)
+3. カテゴリ/タグから`instrument`と判定されたリンクアイテムをcreatorのフォールバックに使う
+   (そのアイテム自身のカスタムフィールドから`--vendor-field`候補名でvendorも探す)
+4. どれも無い場合、このツール自身 / Deltablot にフォールバック
+
+**condition/resultの決定**: 実験のExtra Fields (condition) / 実験本文・タグ (result) に加え、
+カテゴリ/タグから`condition`/`result`と判定されたリンクアイテムのカスタムフィールドも、
+それぞれconditionTemplate/resultTemplateにマージされます。
+
+### 実験自身のカスタムフィールドのグループ化対応 (CUSTOM FIELDS内のMATERIAL/CONDITION/RESULT)
+
+eLabFTWのCUSTOM FIELDSは、フィールドをMATERIAL/CONDITIONのような**折りたたみグループ**にまとめる
+機能があります。この場合、フィールドのグループ名 (`metadata.elabftw.extra_fields_groups`) から
+material/condition/resultのどこに振り分けるかを自動判定します
+(前節の「リンクされたアイテムの役割判定」とは別の、実験自身のカスタムフィールド用の仕組みです)。
+
+| 既定候補文字列 (グループ名) | 振り分け先 |
+| --- | --- |
+| `MATERIAL`, `材料`, `試料`, `Sample` | 試料を表す合成アイテムとして`materialTemplate`/`material`に追加 |
+| `RESULT`, `RESULTS`, `結果` | 最後のSTEPの`resultTemplate`/`result`に追加 |
+| (上記に一致しないグループ、またはグループ無し) | `conditionTemplate`/`condition` (既定/フォールバック) |
+
+自組織のグループ名がこれと異なる場合は、CLIの`--field-group` (`ROLE=値`の形式、`material`/`result`
+のみ指定可、複数指定可) で上書きできます:
+
+```bash
+python elabftw_to_maiml.py --experiment-id 123 --output out.maiml \
+    --field-group material="試料情報" --field-group result="解析結果"
+```
+
 ### カスタムフィールドの型マッピング
 
 | eLabFTWの `extra_fields[].type` | MaiMLの `xsi:type` |
@@ -195,6 +268,14 @@ python elabftw_to_maiml.py --experiment-id 123 --output out.maiml \
 
 ## 既知の制約・今後の拡張ポイント
 
+- **`metadata`フィールドの型ゆれに対応済み**: eLabFTWのAPIは実験・アイテムの`metadata`を
+  JSON文字列のまま返しますが、`elabapi_python`の自動デシリアライズ処理はこの値が
+  dict/listでない場合に静かに内容を破棄し、空のオブジェクトを作ってしまう既知の癖があります。
+  そのため通常の`get_experiment()`/`get_item()`経由では、カスタムフィールド (Extra Fields) が
+  常に空になってしまいます。この問題を回避するため、`elabftw_client.py`の`_get_raw_json()`で
+  `_preload_content=False`を指定し、SDKのデシリアライズを経由しない生JSONレスポンスから
+  直接`metadata`を読み取るようにしています。取得できたフィールド数が0件の場合はコンソールに
+  `[情報]`/`[警告]`ログを出すので、実行時に確認してください。
 - **ペトリネットは単純な直列構造** (材料place → Step1 → Step2 → ... → 結果place) を機械的に生成します。
   分岐・並行工程がある実験は、この単純化では表現しきれないため、必要に応じて `builder.py` の
   `_build_protocol` を拡張してください。
@@ -206,9 +287,9 @@ python elabftw_to_maiml.py --experiment-id 123 --output out.maiml \
   filehashパッケージと組み合わせて、生成した `.maiml` ファイルに後段で署名・チェーン情報を
   付与する運用を想定しています。
 - **添付ファイルの秘匿化**が必要な場合は、既存のAES-256-GCM秘匿化パッケージを本ツールの出力に対して
-  後段で適用してください（本ツール自体は秘匿禁止要素 [第1層タグ等] を秘匿しない前提で組み立てています）。
+  後段で適用してください。
 - **ダウンロードURLの形式** (`app/download.php?f=...&name=...`) はeLabFTWのバージョンにより異なる
   可能性があります。実環境に合わせて `elabftw_client.py` の `_fetch_uploads` を調整してください。
 - 生成されたXMLはUUID (v4) がビルドの都度変わる第1層要素と、名前ベースUUID (v5) で固定される
   creator/owner/vendorが混在します。同一実験を複数回変換すると、`document`等のUUIDは毎回変わりますが、
-  `owner`/`creator`/`vendor`のUUIDは常に同じ値になります (MaiML仕様 4.1節準拠)。
+  `owner`/`creator`/`vendor`のUUIDは常に同じ値になります。
