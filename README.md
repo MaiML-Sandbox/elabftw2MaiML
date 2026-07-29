@@ -270,7 +270,7 @@ python elabftw_to_maiml.py --experiment-id 123 --output out.maiml \
 
 - **`metadata`フィールドの型ゆれに対応済み**: eLabFTWのAPIは実験・アイテムの`metadata`を
   JSON文字列のまま返しますが、`elabapi_python`の自動デシリアライズ処理はこの値が
-  dict/listでない場合に静かに内容を破棄し、空のオブジェクトを作ってしまう既知の癖があります。
+  dict/listでない場合に内容を破棄し、空のオブジェクトを作ります。
   そのため通常の`get_experiment()`/`get_item()`経由では、カスタムフィールド (Extra Fields) が
   常に空になってしまいます。この問題を回避するため、`elabftw_client.py`の`_get_raw_json()`で
   `_preload_content=False`を指定し、SDKのデシリアライズを経由しない生JSONレスポンスから
