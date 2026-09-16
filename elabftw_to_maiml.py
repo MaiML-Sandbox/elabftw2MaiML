@@ -66,6 +66,20 @@ def main() -> int:
                          help="リンクされたアイテムをどこまで再帰的にたどるか (既定値: 2)。"
                               "1なら実験に直接リンクされたアイテムのみ、2なら「アイテムがさらに"
                               "リンクしている別アイテム」まで辿る。循環参照があっても無限ループにはならない")
+    parser.add_argument("--field-mapping", default=None, metavar="PATH",
+                         help="[Phase 5-2/5-3・任意] 実際のCustom Field名をsemantic_type/role/"
+                              "unit/context/targetに対応付けるYAML設定ファイルのパス "
+                              "(elabftw2maiml/interpretation/field_mappings/sem_tem_example.yaml が"
+                              "書式の例)。指定すると、実験のExtra Fieldsと自由記述 (実験本文・Step本文)"
+                              "を突き合わせ、食い違いが無い値だけを自動反映してMaiMLを生成する。"
+                              "食い違いがある値・役割 (role) や反映先 (target) が確定しない値は"
+                              "反映されず、標準出力にレポートとして表示される。省略時は従来通り"
+                              "(このオプション自体が存在しなかった場合と全く同じ動作)")
+    parser.add_argument("--confidence-threshold", type=float, default=1.0,
+                         help="[--field-mapping指定時のみ有効] 候補を自動反映する際のconfidence"
+                              "閾値 (既定値: 1.0)。自由記述からの抽出候補は既定でconfidence=0.95に"
+                              "なるため、1.0のままだと自由記述側は (構造化フィールドと一致していても)"
+                              "常にunclassifiedへの参考情報として残るだけになる")
     args = parser.parse_args()
 
     if not args.host or not args.api_key:
@@ -115,6 +129,40 @@ def main() -> int:
         field_group_candidates=field_group_candidates,
         link_depth=args.link_depth,
     )
+
+    if args.field_mapping:
+        from elabftw2maiml.interpretation import (
+            FieldMapping,
+            build_structured_candidates,
+            InterpretationPipeline,
+            apply_interpretation_report,
+            format_interpretation_report,
+            SemTemTextRuleInterpreter,
+        )
+
+        field_mapping = FieldMapping.from_yaml_file(args.field_mapping)
+        raw_fields = client.fetch_raw_custom_fields(args.experiment_id)
+        structured_candidates, unmapped_fields = build_structured_candidates(
+            raw_fields, field_mapping, source="custom_field")
+
+        pipeline = InterpretationPipeline(
+            extra_text_interpreters=[SemTemTextRuleInterpreter()],
+            confidence_threshold=args.confidence_threshold,
+        )
+        report = pipeline.interpret_experiment(exp_data, structured_candidates=structured_candidates)
+        apply_logs = apply_interpretation_report(exp_data, report, ns_prefix=args.ns_prefix)
+
+        print("\n--- 対応表 (--field-mapping) による解釈結果 -----------------------------")
+        print(format_interpretation_report(report))
+        if apply_logs:
+            print("\n[ExperimentDataへの反映ログ]")
+            for line in apply_logs:
+                print(f"  {line}")
+        if unmapped_fields:
+            print("\n[対応表に定義が無いため無視されたフィールド]")
+            for f in unmapped_fields:
+                print(f"  - {f.name} (group={f.group})")
+        print("--------------------------------------------------------------------------\n")
 
     builder = MaimlBuilder(ns_prefix=args.ns_prefix, ns_uri=args.ns_uri,
                             elab_host=client.base_url)

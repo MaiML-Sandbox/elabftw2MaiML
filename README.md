@@ -83,6 +83,31 @@ elabftw2maiml/
     text.py              TextRuleInterpreter (自由記述からの温度/時間/質量/体積/回転数/pH抽出)
     conflict.py          InterpretationCandidate/Conflict (構造化情報と自由記述の値の突き合わせ)
     policy.py             情報源ごとのconfidenceポリシー (DEFAULT_SOURCE_CONFIDENCE等)
+    pipeline.py            InterpretationPipeline/InterpretationReport (Phase5-1: 自由記述候補の
+                          収集・構造化候補との統合・競合検出・仕分けを行う接続基盤。
+                          extra_text_interpreters引数で、SEM/TEM等の分野固有プロファイル
+                          (profiles/以下) を汎用のTextRuleInterpreterと組み合わせられる)
+    apply.py               apply_interpretation_report() (Phase5-3: InterpretationReportの
+                          accepted候補だけをExperimentDataへ反映する。競合(conflicts)・
+                          未分類(unclassified)は反映せず、反映ログ(List[str])を返す。
+                          既存の値は上書きせずスキップする)
+    field_mapping.py        RawField/FieldRule/FieldMapping (Phase5-2: eLabFTWのCustom Field名を
+                          role/semantic_type/unit/context/targetに対応付ける設定可能な対応表。
+                          対応表自体はYAML/dictとして外部化されており、コードには固定しない)
+    field_mappings/
+      sem_tem_example.yaml  SEM/TEM観察の汎用的な対応表の例 (SEM_TEM_field_mapping_example.md
+                          10節のMVPフィールド一覧に対応。装置メーカーや特定研究室に依存しない
+                          一般例であり、実運用ではフィールド名・単位を必ず調整すること)
+      yasunaga_lab_stem.yaml  YasunagaLabのSTEM実験で実際に使われているCustom Field名
+                          (MATERIAL/CONDITION/RESULTの各フィールドグループ) に合わせた
+                          対応表 (Phase 5-4)。DwellTime/PixelSizeは (ユーザーへの
+                          確認済み) 単位無しの無次元数値のため`unit`を指定していない。
+    profiles/
+      sem_tem.py            SemTemTextRuleInterpreter (SEM/TEM固有の自由記述からの
+                          加速電圧・作動距離・倍率・プローブ電流・試料傾斜角・粒径・
+                          格子縞間隔・カメラ長の抽出。汎用のtext.pyには単位を追加せず、
+                          意味キーワード+数値+単位の組み合わせのみを対象とすることで
+                          誤検出を防ぐ。倍率のローマ字"x"単体表記は対象外)
 elabftw_to_maiml.py    CLIエントリポイント
 test_build_and_validate.py  合成データでのビルド+XSD検証テスト（実行には"./schema/"が必要）
 tests/                 pytestによる回帰テスト・単体テスト (詳細は下記「テスト」参照)
@@ -123,6 +148,8 @@ python elabftw_to_maiml.py --experiment-id 123 --output experiment_123.maiml
 | `--field-group` | 任意 (`ROLE=値` 形式、`material`/`result`のみ、複数指定可) | 既定候補 (「MATERIAL」「RESULT」等) | 実験自身のカスタムフィールドグループ名からROLEへ振り分け |
 | `--instrument-category` | 任意 (複数指定可、非推奨) | 既定候補 (「Resources」「装置」等) | `--role-category instrument=...`と同じ (互換用) |
 | `--instrument-tag` | 任意 (複数指定可、非推奨) | 既定候補 (「Resources」「装置」等) | `--role-tag instrument=...`と同じ (互換用) |
+| `--field-mapping` | 任意 | 無し (指定しない限りPhase5の処理は一切実行されない) | Phase5-2/5-3: 実際のCustom Field名をsemantic_type/role/unit/context/targetに対応付けるYAML設定ファイルのパス。詳細は次節「対応表による構造化フィールド・自由記述の統合 (Phase 5-2/5-3)」参照 |
+| `--confidence-threshold` | 任意 (`--field-mapping`指定時のみ有効) | `1.0` | 候補を自動反映するconfidenceの閾値 |
 
 実質必須な組み合わせ:
 
@@ -135,6 +162,79 @@ python elabftw_to_maiml.py \
 ```
 
 (`--host`/`--api-key`は環境変数で渡せば省略可)
+
+## 対応表による構造化フィールド・自由記述の統合 (Phase 5-2/5-3)
+
+通常の変換 (`--field-mapping` を指定しない場合) は、実験のExtra Fieldsを
+eLabFTWの「フィールドグループ」機能 (MATERIAL/CONDITION/RESULT) だけで
+material/condition/resultに振り分けます (Phase 1〜4の既存動作、変更なし)。
+
+`--field-mapping` にYAML設定ファイル (書式は
+`elabftw2maiml/interpretation/field_mappings/sem_tem_example.yaml` を参照。
+**このファイル自体は装置メーカー・特定研究室に依存しない汎用例であり、実運用では
+必ず自組織の実際のCustom Field名に合わせて調整すること**) を渡すと、追加で
+次の処理を行います:
+
+1. 対応表に定義されたCustom Field名を `semantic_type`/`role`/`context`/
+   `target` を持つ候補 (structured candidates) に変換する。
+2. 実験本文・各Stepの本文から、自由記述のルールベース抽出
+   (`TextRuleInterpreter` + SEM/TEM固有の`SemTemTextRuleInterpreter`) で
+   候補を収集する。
+3. 1と2を統合し、同じ意味種別・同じcontextの値が食い違っていないか確認する
+   (`interpretation.detect_conflicts()`)。
+4. 食い違いが無く、`role`/`semantic_type`/`context`/`target`が全て確定した
+   候補だけを自動的にExperimentDataへ反映する (`role`/`target`が対応表に
+   無い、または食い違いがある値は**自動反映しない**)。
+5. 反映結果・競合・未分類の候補は、変換実行時に標準出力へレポートとして
+   表示される (対応表に定義の無いフィールド名も、黙って無視せず一覧表示する)。
+
+```bash
+python elabftw_to_maiml.py --experiment-id 123 --output out.maiml \
+    --field-mapping elabftw2maiml/interpretation/field_mappings/sem_tem_example.yaml
+```
+
+**この機能で実際にExperimentDataへ反映できる`target`は次の4種類のみ**
+(それ以外の`target`値を対応表に書いても、反映されずログに警告が出るだけ):
+
+| `target` | 反映先 | 備考 |
+| --- | --- | --- |
+| `condition_properties` | `ExperimentData.condition_properties` | そのまま追加 |
+| `result_properties` | `ExperimentData.result_properties` | そのまま追加 |
+| `materials` | `ExperimentData.materials` | `elab_id=0`の合成`LinkedItem`にまとめる (既存の「MATERIALグループの自己カスタムフィールド」と同じ規約を再利用し、二重に分裂させない) |
+| `instrument` | `ExperimentData.instruments` | 値を表示名とする`Party`を追加 (同名は重複追加しない) |
+
+既に同じキー (semantic_typeから生成) の値が存在する場合は、**上書きせずスキップ**
+します (development planの「一方で他方を上書きしない」という既存方針を、
+ExperimentDataへの反映段階でも維持しています)。
+
+**構造化フィールドの単位正規化**: eLabFTWのExtra Fieldsは値と単位を別々に持つ
+仕組みが無く、単位はフィールド名 (`AcceleratingVoltage(kV)`等) や値の文字列
+(`"200 kV"`等) に含まれることがあります。競合判定 (`detect_conflicts()`) の前に、
+`interpretation/normalize.py` の`parse_numeric_with_unit()`が構造化フィールドの値を
+自由記述側と同じ内部表現 (数値 + 正規化後の単位、内部的には`Decimal`) に揃えます。
+
+- 空白の有無 (`"200 kV"`/`"200kV"`) や、µ/μ/u・°/度などの表記の揺れは同一の単位
+  として扱う。
+- 値が単位を含まない裸の数値 (`"200"`や数値そのもの) の場合は、対応表の`unit`を
+  補って正規化する。
+- **単位換算 (V→kV等) は行わない** (初期実装のスコープ外)。対応表が期待する単位と
+  次元が異なる値 (例: 期待単位`kV`に対し`"200 mA"`) や、数値として解釈できない値
+  (例: `"not measured"`) は、正規化できないものとして扱い、`role`/`target`を
+  未確定にする。これにより、その値は競合としても正常値としても扱われず
+  `unclassified`に残り、変換実行時のレポートに元の値 (`raw_value`) と理由
+  (`reason`) が表示される (自動反映もされないが、黙って捨てられることもない)。
+- 正規化に成功した値は`InterpretationCandidate.raw_value`に元の文字列
+  (例: `"200 kV"`) を保持したままなので、変換結果を後から原記録と照合できる。
+- 対応表に`unit`を指定していないフィールドでも、`data_type: number`を指定して
+  いれば数値として正規化する (例: `DwellTime`="10"、`PixelSize`="0.025"のように、
+  値に単位が含まれず対応表側でも単位が未確定のフィールド)。この場合は
+  `unit`が`None`のまま`Decimal`化されるだけで、単位の食い違いチェックは行わない。
+  `unit`も`data_type: number`も指定していないフィールド (文字列フィールドの大半)
+  は、従来通り値をそのまま (文字列として) 扱う。
+
+単位換算が必要な値 (例: `"200000 V"`を`200 kV`として扱いたい場合) は、現時点では
+対応表の`unit`と実際の入力形式を揃えるか、値の前処理を別途検討してください
+(development planのPhase 5-4「実データによる検証」で確認する想定の項目です)。
 
 ## テスト
 
@@ -189,6 +289,63 @@ python -m pytest tests/
   自由記述が矛盾する場合) を、`TextRuleInterpreter.extract()` ->
   `candidate_from_extracted_value()` -> `detect_conflicts()` という実際の
   呼び出し順序で通し、組み合わせたときの挙動を今後の回帰基準として固定する。
+- `tests/test_pipeline.py`: `interpretation/pipeline.py` (Phase5-1の接続基盤)
+  の単体テスト。`ExperimentData`/`Step`の`body_text`/`body`から自由記述候補を
+  収集してcontext ("experiment"/"step:<id>") を付与すること、構造化候補
+  (呼び出し側が用意したもの) との統合・競合検出、`role`/`target`/`context`/
+  `semantic_type`が確定しconfidenceが閾値以上の候補だけが`accepted`になり、
+  競合した候補は`accepted`/`unclassified`のどちらにも入らず`conflicts`にのみ
+  残ることを検証する。elabftw2MaiML_phase5_design.md 15節の統合テスト方針の
+  うち、実フィールド名の対応表 (Phase5-2) を必要としない項目に対応する。
+- `tests/test_field_mapping.py`: `interpretation/field_mapping.py` (Phase5-2の
+  設定可能なフィールドマッピング) の単体テスト。`FieldMapping.from_dict()`/
+  `from_yaml_file()` による対応表読み込み (`field_mappings/sem_tem_example.yaml`
+  を実際に読み込むケースを含む)、フィールド名・aliasの両方での`lookup()`、
+  `candidate_from_field()`が`role`/`semantic_type`/`unit`/`context`/`target`を
+  正しく組み立てること、`context_override`/`role_override`が対応表側の値より
+  優先されること (SEM_TEM_field_mapping_example.md 7節: 「加速電圧」等の
+  SEM/TEM共通フィールドをCustom Field GroupやStep種別から区別するケース)、
+  および`build_structured_candidates()`が対応表に無いフィールドを取り零さず
+  `unmapped_fields`として返すこと (design doc 15節-9) を検証する。
+- `tests/test_sem_tem_profile.py`: `interpretation/profiles/sem_tem.py`
+  (`SemTemTextRuleInterpreter`) の単体テスト。Phase 1で対応する8種の意味種別
+  (加速電圧・作動距離・倍率・プローブ電流・試料傾斜角・粒径・格子縞間隔・
+  カメラ長) それぞれについて、意味キーワード+数値+単位の組み合わせから正しく
+  抽出できることを確認する。特に重点を置いているのは次の2点:
+  (1) 意味キーワードを伴わない単位・数値のみの表現 ("5 kV"単体等) は
+  意味種別を確定できないため一切抽出されないこと、
+  (2) 倍率について、安全な5表現 (「倍率 50,000」等) のみを対象とし、
+  ローマ字"x"単体表記 ("50000x"/"x50000") や次元表記 ("10 x 20")、
+  キーワード・観察文脈語を伴わない「数値+倍」(希釈倍率等との混同を避ける)
+  は対象外とすること。
+- `tests/test_raw_fields_from_metadata.py`: `elabftw_client.py`の
+  `raw_fields_from_metadata()`/`ElabftwClient.fetch_raw_custom_fields()`
+  (Phase5-3: 実際のeLabFTWのExtra Fieldsを`RawField`へ変換する) の単体テスト。
+  カスタムフィールドのグループ名 (`extra_fields_groups`) が`RawField.group`に
+  正しく渡ること、グループ無しのフィールドは`group=None`になることを検証する。
+- `tests/test_apply.py`: `interpretation/apply.py`の
+  `apply_interpretation_report()` (Phase5-3: `InterpretationReport`の
+  `accepted`候補をExperimentDataへ反映する) の単体テスト。`target`ごとの
+  反映先 (condition_properties/result_properties/materials/instrument) が
+  正しいこと、既存の値を上書きせずスキップすること、`conflicts`/
+  `unclassified`は絶対に反映されないこと、`materials`への反映が既存の
+  `elabftw_client.py`の`elab_id=0`合成アイテムの規約と衝突せず1つに
+  まとまることを検証する。
+- `tests/test_phase5_3_end_to_end.py`: 構造化フィールド (Custom Field) と
+  自由記述 (実験本文) が一部で食い違うという、より実際に近いシナリオを使った
+  統合テスト。「値が食い違う項目は自動反映されない」「値が一致する項目は
+  構造化側のみ1回だけ反映される」「対応表に無い言及は自由記述に無ければ
+  そのまま反映される」ことを、`build_structured_candidates()` ->
+  `InterpretationPipeline.interpret_experiment()` ->
+  `apply_interpretation_report()` -> `MaimlBuilder.to_bytes()` という実際の
+  呼び出し順序で通して確認する。生成XMLの整形式性と、`schemas/maiml.xsd`が
+  存在する場合はそれに対する妥当性も検証する (無い環境ではスキップ)。
+- `tests/test_cli_field_mapping.py`: `elabftw_to_maiml.py`の`--field-mapping`
+  オプション (Phase5-3のCLI統合) のテスト。ネットワークに接続せず
+  `tests.fixtures`の合成データで`ElabftwClient`を差し替え、CLI全体が
+  例外なく実行できること、対応表に無いフィールドが標準出力に報告されること、
+  `--field-mapping`を指定しない場合は関連する出力が一切出ないこと
+  (既存動作に影響が無いこと) を確認する。
 
 ## マッピング設計 (eLabFTW -> MaiML)
 

@@ -4,7 +4,7 @@
     <uuid>00000000-0000-4000-8000-000000000001</uuid>
     <description>汎用天秤による秤量</description>
     <creator id="creator_instrument">
-      <uuid>679807da-1791-56a1-88ab-977919ec8727</uuid>
+      <uuid>71135d09-b0b0-5d54-a040-c010792f3441</uuid>
       <description>ns1:elabftw-to-maiml</description>
       <vendorRef id="vref_creator" ref="vendor_of_creator"/>
     </creator>

@@ -55,7 +55,7 @@ from .model import ExperimentData, Party, PropertyValue, LinkedItem, Step
 from .uuids import new_uuid, named_uuid
 
 VENDOR_KEY = ("elabftw-vendor", "deltablot")
-CREATOR_SOFTWARE_VERSION = "0.2.0"  # このコンバータ自体のバージョン (プロジェクトのリリース番号と一致させる)。
+CREATOR_SOFTWARE_VERSION = "0.3.0"  # このコンバータ自体のバージョン (プロジェクトのリリース番号と一致させる)。
                                      # 上げたらMaiML内の「変換ソフトウェア」エンティティのUUIDが変わる。
 
 
