@@ -1,0 +1,161 @@
+# SEM・TEM対応表の例 (SEM_TEM_field_mapping_example.md 10節の「初期MVPで採用する
+# フィールド」に対応する)。
+#
+# 装置メーカーや特定研究室に依存しない一般例であり、実運用ではeLabFTW上の実際の
+# Custom Field名・単位・研究室内の記録ルールに合わせて必ず調整すること
+# (SEM_TEM_field_mapping_example.md 1節)。
+#
+# 「加速電圧」「観察モード」「倍率」「粒径」など、SEM・TEMの両方に登場する
+# フィールド名は、このファイルではcontextを固定していない。SEM_TEM_field_mapping_example.md
+# 7節の通り、eLabFTW上のCustom Field Group (例: SEM_CONDITION / TEM_CONDITION)
+# から呼び出し側 (`build_structured_candidates()` の `context_for`) がcontextを
+# 決定する想定。
+
+version: 1
+
+fields:
+  # --- 共通 (3節) -----------------------------------------------------------
+  試料ID:
+    aliases: [Sample ID]
+    role: material
+    semantic_type: sample_id
+    data_type: string
+    context: experiment
+    target: materials
+    required: true
+
+  装置名:
+    aliases: [Instrument Name]
+    role: instrument
+    semantic_type: instrument_name
+    data_type: string
+    target: instrument
+    required: true
+    # SEM/TEM共通。contextはGroupから付与する。
+
+  # --- SEM MVP (4節・10節) ---------------------------------------------------
+  加速電圧:
+    aliases: [Acceleration Voltage, Accelerating Voltage, HV]
+    role: condition
+    semantic_type: accelerating_voltage
+    data_type: number
+    unit: kV
+    target: condition_properties
+    required: true
+    # SEM/TEM共通。contextはGroupから付与する (sem_acquisition/tem_acquisition)。
+
+  観察モード:
+    aliases: [Imaging Mode]
+    role: condition
+    semantic_type: imaging_mode
+    data_type: string
+    target: condition_properties
+    required: true
+    # SEM/TEM共通。値の語彙は装置により異なる (SE/BSE等 vs BF-TEM/HRTEM等)。
+
+  倍率:
+    aliases: [Magnification]
+    role: condition
+    semantic_type: magnification
+    data_type: number
+    unit: x
+    target: condition_properties
+    required: true
+    # SEM/TEM共通。
+
+  ワーキングディスタンス:
+    aliases: [Working Distance, WD]
+    role: condition
+    semantic_type: working_distance
+    data_type: number
+    unit: mm
+    context: sem_acquisition
+    target: condition_properties
+
+  検出器:
+    aliases: [Detector]
+    role: instrument
+    semantic_type: detector_name
+    data_type: string
+    context: sem_acquisition
+    target: instrument
+    required: true
+
+  SEM画像:
+    aliases: [SEM Image]
+    role: result
+    semantic_type: sem_image
+    data_type: file
+    context: sem_acquisition
+    target: result_properties
+    required: true
+
+  粒径:
+    aliases: [Particle Size, Diameter]
+    role: result
+    semantic_type: particle_size
+    data_type: number
+    unit: nm
+    target: result_properties
+    # SEM/TEM共通。contextはGroupから付与する (sem_analysis/tem_analysis)。
+
+  表面形態所見:
+    aliases: [Morphology Observation]
+    role: result
+    semantic_type: morphology_observation
+    data_type: string
+    context: sem_analysis
+    target: result_properties
+
+  # --- TEM MVP (5節・10節) ---------------------------------------------------
+  TEMグリッド:
+    aliases: [TEM Grid]
+    role: material
+    semantic_type: tem_grid
+    data_type: string
+    context: sample_preparation
+    target: materials
+    required: true
+
+  カメラ長:
+    aliases: [Camera Length]
+    role: condition
+    semantic_type: camera_length
+    data_type: number
+    unit: mm
+    context: tem_diffraction
+    target: condition_properties
+
+  TEM画像:
+    aliases: [TEM Image]
+    role: result
+    semantic_type: tem_image
+    data_type: file
+    context: tem_acquisition
+    target: result_properties
+    required: true
+
+  回折像:
+    aliases: [Diffraction Pattern]
+    role: result
+    semantic_type: diffraction_pattern
+    data_type: file
+    context: tem_diffraction
+    target: result_properties
+
+  格子縞間隔:
+    aliases: [Lattice Spacing, d-spacing]
+    role: result
+    semantic_type: lattice_spacing
+    data_type: number
+    unit: nm
+    context: tem_analysis
+    target: result_properties
+
+  結晶相:
+    aliases: [Crystal Phase]
+    role: result
+    semantic_type: crystal_phase
+    data_type: string
+    context: tem_analysis
+    target: result_properties

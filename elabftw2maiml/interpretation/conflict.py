@@ -54,6 +54,17 @@ class InterpretationCandidate:
         自由記述由来の場合の原文。呼び出し元が追跡可能性のために保持したい場合に使う。
     reason:
         判定根拠の説明 (任意)。
+    role:
+        MaiML上の役割 ("material" / "condition" / "result" 等)。Phase 5設計
+        (elabftw2MaiML_phase5_design.md 4節) に基づき、フィールド名 -> semantic_type
+        だけでなく role も明示することで、同じ semantic_type でも役割が異なる値
+        (例: 材料の質量 vs 測定条件としての質量) を区別できるようにする。
+        未確定 (自由記述からの抽出直後など) の場合は None。
+    target:
+        MaiMLへの実際の反映先 ("materials" / "condition_properties" /
+        "result_properties" 等)。role と対になる情報で、これも未確定なら None。
+        role/target が両方確定し、かつ競合が無く confidence が十分高い候補だけを
+        自動反映してよい、という判断は呼び出し側 (interpretation/pipeline.py) が行う。
     """
 
     semantic_type: str
@@ -64,6 +75,8 @@ class InterpretationCandidate:
     context: Optional[str] = None
     source_text: Optional[str] = None
     reason: Optional[str] = None
+    role: Optional[str] = None
+    target: Optional[str] = None
 
 
 @dataclass(frozen=True)

@@ -28,6 +28,7 @@ from .interpretation import (
     DEFAULT_ROLE_CATEGORY_CANDIDATES,
     DEFAULT_ROLE_TAG_CANDIDATES,
     DEFAULT_FIELD_GROUP_CANDIDATES,
+    RawField,
 )
 
 # eLabFTWのカスタムフィールド type -> MaiMLのxsi:type マッピング。
@@ -164,6 +165,33 @@ def _normalize_field_groups(metadata) -> dict:
         return {g.get("id"): g.get("name") for g in groups if g.get("id") is not None and g.get("name")}
 
     return {}
+
+
+def raw_fields_from_metadata(metadata) -> list:
+    """eLabFTWのraw metadataから、Phase 5-2 (`interpretation.field_mapping`) が
+    要求する`RawField`のリストを作る (Phase 5-3: elabftw2MaiML_phase5_design.md)。
+
+    `RawField.value`にはeLabFTW側の生の値をそのまま渡す (単位変換は行わない)。
+    eLabFTWのExtra Fieldsには値と単位を分けて持つ仕組みが無く、単位はフィールド名
+    ("AcceleratingVoltage(kV)"等) や値の文字列 ("200 kV"等) に含まれることが多いため、
+    `RawField.unit`は常にNoneとし、単位の解決は対応表 (`FieldRule.unit`) 側に委ねる。
+
+    `RawField.group`には、eLabFTWの「カスタムフィールドのグループ化」機能
+    (CUSTOM FIELDS内のMATERIAL/CONDITION/RESULT等) のグループ名をそのまま入れる
+    (`FieldMapping`の`context_for`で、グループ名からcontextを決める用途を想定。
+    SEM_TEM_field_mapping_example.md 7節)。グループが無いフィールドはNoneになる。
+    """
+    extra_fields = _normalize_extra_fields(metadata)
+    if not extra_fields:
+        return []
+    group_names = _normalize_field_groups(metadata)
+
+    raw_fields = []
+    for field_name, field_dict in extra_fields.items():
+        field = _ExtraField(field_dict)
+        group_name = group_names.get(field.group_id) if field.group_id is not None else None
+        raw_fields.append(RawField(name=field_name, value=field.value, unit=None, group=group_name))
+    return raw_fields
 
 
 class _ExtraField:
@@ -456,6 +484,18 @@ class ElabftwClient:
         return steps
 
     # -- 公開API -------------------------------------------------------------
+
+    def fetch_raw_custom_fields(self, experiment_id: int) -> list:
+        """実験のExtra Fieldsを、Phase 5-2/5-3 (`interpretation.field_mapping`/
+        `interpretation.apply`) が使う`RawField`のリストとして取得する。
+
+        `fetch_experiment()`とは独立して呼べる (どちらも`_get_raw_json()`で生JSONを
+        取得するだけで、互いに依存しない)。実際のCustom Field名を使った対応表
+        (`FieldMapping`) と組み合わせて、構造化候補の元データとして使う想定。
+        """
+        raw_experiment = self._get_raw_json(f"/experiments/{experiment_id}")
+        raw_metadata = raw_experiment.get("metadata") if raw_experiment else None
+        return raw_fields_from_metadata(raw_metadata)
 
     def fetch_experiment(self, experiment_id: int, ns_prefix: str = "ns1",
                           creator_field_candidates: Optional[list] = None,
