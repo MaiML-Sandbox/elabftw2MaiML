@@ -100,8 +100,8 @@ elabftw2maiml/
                           一般例であり、実運用ではフィールド名・単位を必ず調整すること)
       yasunaga_lab_stem.yaml  YasunagaLabのSTEM実験で実際に使われているCustom Field名
                           (MATERIAL/CONDITION/RESULTの各フィールドグループ) に合わせた
-                          対応表 (Phase 5-4)。DwellTime/PixelSizeは単位が未確定のため
-                          `unit`を指定していない (ファイル内のコメント参照)。
+                          対応表 (Phase 5-4)。DwellTime/PixelSizeは (ユーザーへの
+                          確認済み) 単位無しの無次元数値のため`unit`を指定していない。
     profiles/
       sem_tem.py            SemTemTextRuleInterpreter (SEM/TEM固有の自由記述からの
                           加速電圧・作動距離・倍率・プローブ電流・試料傾斜角・粒径・

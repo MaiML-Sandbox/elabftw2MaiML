@@ -143,7 +143,8 @@ class TestEmbeddedUnitFieldsDoNotFalselyConflict:
         assert image_width.value == Decimal("2048")
         assert image_width.unit == "pixel"
 
-        # 単位不明のためunitを指定していないフィールドは、裸の数値として反映される。
+        # 単位無し (無次元) であることが確認済みのフィールドは、unit=Noneの
+        # まま裸の数値 (Decimal) として反映される。
         dwell_time = by_type["dwell_time"]
         assert dwell_time.value == Decimal("10")
         assert dwell_time.unit is None

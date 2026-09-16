@@ -6,17 +6,16 @@
 # フィールドグループに存在するCustom Field名 (2026-09-16にユーザーから共有された
 # スクリーンショット由来) に合わせて調整したもの。
 #
-# 注意 (要確認事項。README/CHANGELOGにも記載):
+# 確認済みの事項 (2026-09-16、ユーザーへの確認結果):
 #   - DwellTime / PixelSize は、値の文字列に単位が含まれておらず (例: "10",
-#     "0.025")、フィールド名にも単位が無いため、実際の単位が不明。ひとまず
-#     unit を指定せず (裸の数値のまま反映) にしているが、正しい単位が分かれば
-#     `unit:` を追加すること (例: DwellTime→µs、PixelSize→nm/pixel 等)。
-#   - Grid の値は共有されたスクリーンショットの文字列
-#     ("Square Pillar Array,10µm Ptch,Square / cular Pillar Array,5µm
-#     Ptch,Circular") がドロップダウンの選択肢一覧のように見え、実際に選択
-#     された1件の値なのか確信が持てなかったため、semantic_type/targetは
-#     用意しつつ data_type は string のまま、正規化の対象にはしていない
-#     (数値+単位の正規化はそもそも文字列フィールドには適用されない)。
+#     "0.025")、フィールド名にも単位が無い。ユーザーに確認の上、これらは
+#     実際に単位無し (無次元の数値) で正しいことを確認済み。そのため
+#     unit は意図的に指定していない (裸の数値としてそのまま反映される。
+#     data_type: number により、単位無しでもDecimalとして正規化はされる)。
+#   - Grid の値 ("Square Pillar Array,10µm Ptch,Square" 等) は、ドロップダウンの
+#     選択肢一覧ではなく、実際にその実験で選択された1件の値そのものである
+#     ことを確認済み。文字列フィールドとして扱う (数値+単位の正規化は
+#     そもそも文字列フィールドには適用されない)。
 
 version: 1
 
@@ -28,7 +27,6 @@ fields:
     data_type: string
     context: experiment
     target: materials
-    # 値の実例が選択肢一覧なのか実際の選択値なのか未確認 (上記注意参照)。
 
   sampleID:
     role: material
@@ -117,7 +115,7 @@ fields:
     role: result
     semantic_type: dwell_time
     data_type: number
-    # 単位不明のため未設定 (上記注意参照)。判明したら unit を追加すること。
+    # 単位無しで正しいことを確認済み (上記注意参照)。unitは意図的に未設定。
     context: experiment
     target: result_properties
 
@@ -125,7 +123,7 @@ fields:
     role: result
     semantic_type: pixel_size
     data_type: number
-    # 単位不明のため未設定 (上記注意参照)。判明したら unit を追加すること。
+    # 単位無しで正しいことを確認済み (上記注意参照)。unitは意図的に未設定。
     context: experiment
     target: result_properties
 
