@@ -1,0 +1,184 @@
+# YasunagaLab STEM実験の対応表 (development plan Phase 5-4「実際のCustom Field名で
+# 対応表を調整する」に対応)。
+#
+# elabftw2MaiML_phase5_design.md / SEM_TEM_field_mapping_example.md の汎用例
+# (`sem_tem_example.yaml`) を、実際にeLabFTW上のMATERIAL/CONDITION/RESULT
+# フィールドグループに存在するCustom Field名 (2026-09-16にユーザーから共有された
+# スクリーンショット由来) に合わせて調整したもの。
+#
+# 注意 (要確認事項。README/CHANGELOGにも記載):
+#   - DwellTime / PixelSize は、値の文字列に単位が含まれておらず (例: "10",
+#     "0.025")、フィールド名にも単位が無いため、実際の単位が不明。ひとまず
+#     unit を指定せず (裸の数値のまま反映) にしているが、正しい単位が分かれば
+#     `unit:` を追加すること (例: DwellTime→µs、PixelSize→nm/pixel 等)。
+#   - Grid の値は共有されたスクリーンショットの文字列
+#     ("Square Pillar Array,10µm Ptch,Square / cular Pillar Array,5µm
+#     Ptch,Circular") がドロップダウンの選択肢一覧のように見え、実際に選択
+#     された1件の値なのか確信が持てなかったため、semantic_type/targetは
+#     用意しつつ data_type は string のまま、正規化の対象にはしていない
+#     (数値+単位の正規化はそもそも文字列フィールドには適用されない)。
+
+version: 1
+
+fields:
+  # --- MATERIAL --------------------------------------------------------------
+  Grid:
+    role: material
+    semantic_type: grid_pattern
+    data_type: string
+    context: experiment
+    target: materials
+    # 値の実例が選択肢一覧なのか実際の選択値なのか未確認 (上記注意参照)。
+
+  sampleID:
+    role: material
+    semantic_type: sample_id
+    data_type: string
+    context: experiment
+    target: materials
+    required: true
+
+  sampleName:
+    role: material
+    semantic_type: sample_name
+    data_type: string
+    context: experiment
+    target: materials
+    required: true
+
+  pretreatment:
+    role: material
+    semantic_type: pretreatment_state
+    data_type: string
+    context: experiment
+    target: materials
+
+  # --- CONDITION ---------------------------------------------------------------
+  ImagingMode:
+    role: condition
+    semantic_type: imaging_mode
+    data_type: string
+    context: experiment
+    target: condition_properties
+    required: true
+
+  Aperture(µm):
+    role: condition
+    semantic_type: objective_aperture
+    data_type: number
+    unit: µm
+    context: experiment
+    target: condition_properties
+
+  Magnification:
+    role: condition
+    semantic_type: magnification
+    data_type: number
+    unit: x
+    context: experiment
+    target: condition_properties
+    required: true
+    # 値の文字列自体には単位が含まれない ("200000")。対応表のunitを補って正規化する。
+
+  CameraLength(mm):
+    role: condition
+    semantic_type: camera_length
+    data_type: number
+    unit: mm
+    context: experiment
+    target: condition_properties
+
+  AcceleratingVoltage(kV):
+    role: condition
+    semantic_type: accelerating_voltage
+    data_type: number
+    unit: kV
+    context: experiment
+    target: condition_properties
+    required: true
+
+  ElectronDose(e⁻/Å²):
+    role: condition
+    semantic_type: electron_dose
+    data_type: number
+    unit: e⁻/Å²
+    context: experiment
+    target: condition_properties
+
+  # --- RESULT --------------------------------------------------------------
+  Detector:
+    role: result
+    semantic_type: detector_name
+    data_type: string
+    context: experiment
+    target: result_properties
+
+  DwellTime:
+    role: result
+    semantic_type: dwell_time
+    data_type: number
+    # 単位不明のため未設定 (上記注意参照)。判明したら unit を追加すること。
+    context: experiment
+    target: result_properties
+
+  PixelSize:
+    role: result
+    semantic_type: pixel_size
+    data_type: number
+    # 単位不明のため未設定 (上記注意参照)。判明したら unit を追加すること。
+    context: experiment
+    target: result_properties
+
+  FrameCount:
+    role: result
+    semantic_type: frame_count
+    data_type: number
+    # 枚数なので単位なし (次元を持たない)。
+    context: experiment
+    target: result_properties
+
+  SignalType:
+    role: result
+    semantic_type: signal_type
+    data_type: string
+    context: experiment
+    target: result_properties
+
+  ImageFormat:
+    role: result
+    semantic_type: image_format
+    data_type: string
+    context: experiment
+    target: result_properties
+
+  AcquisitionTime:
+    role: result
+    semantic_type: acquisition_time
+    data_type: number
+    unit: s
+    context: experiment
+    target: result_properties
+
+  FieldofView(µm):
+    role: result
+    semantic_type: field_of_view
+    data_type: number
+    unit: µm
+    context: experiment
+    target: result_properties
+
+  ImageWidth(pixel):
+    role: result
+    semantic_type: image_width
+    data_type: number
+    unit: pixel
+    context: experiment
+    target: result_properties
+
+  ImageHeight(pixel):
+    role: result
+    semantic_type: image_height
+    data_type: number
+    unit: pixel
+    context: experiment
+    target: result_properties

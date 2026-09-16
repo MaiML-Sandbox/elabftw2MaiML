@@ -190,7 +190,15 @@ def candidate_from_field(
     unit = expected_unit
     raw_value = None
 
-    if expected_unit is not None:
+    # 単位が無いフィールドでも、対応表が data_type: number を明示している場合は
+    # 正規化を行う (例: DwellTime="10"、PixelSize="0.025" のように、単位不明のまま
+    # 数値として記録されているフィールド)。`parse_numeric_with_unit()` は
+    # expected_unit=None でも単位の食い違いチェックをスキップして数値のみを
+    # 解析できるため、そのまま呼び出せる。単位も data_type も無いフィールド
+    # (文字列フィールドの大半) は、従来通り正規化をスキップする (レガシー挙動)。
+    should_normalize = expected_unit is not None or rule.data_type == "number"
+
+    if should_normalize:
         normalized = parse_numeric_with_unit(raw.value, expected_unit=expected_unit)
         if normalized is not None:
             value = normalized.value

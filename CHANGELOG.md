@@ -136,6 +136,38 @@ All notable changes to this project are documented in this file.
   - 公式XSD (`maiml-schema-validator`スキル同梱のスキーマ) による検証済み
     (正規化後の`Decimal`値もMUSTレベルのエラーなく`doubleType`として出力
     される)。
+- Fixed `field_mapping.py`'s `candidate_from_field()` skipping numeric
+  normalization entirely for fields that declare `data_type: number` but no
+  expected `unit` (discovered while adjusting the mapping table to real
+  Custom Field names below — e.g. `DwellTime`="10", `PixelSize`="0.025", 単位が
+  値にも対応表にも存在しない)。従来は`unit`が指定されていなければ正規化その
+  ものをスキップし、値が文字列のまま (`stringType`として) 出力されていた。
+  `data_type: number`が明示されていれば、`unit=None`のまま
+  `parse_numeric_with_unit()`を呼び (単位の食い違いチェックはスキップされる)、
+  `Decimal`として正規化する。`unit`も`data_type: number`も無いフィールド
+  (文字列フィールドの大半) は従来通り正規化をスキップする。
+
+### Added (Phase 5-4: 実データによる検証、対応表の調整)
+
+- Added `elabftw2maiml/interpretation/field_mappings/yasunaga_lab_stem.yaml`。
+  YasunagaLabのSTEM実験で実際にeLabFTW上に存在するMATERIAL/CONDITION/RESULT
+  フィールドグループのCustom Field名 (2026-09-16にユーザーから共有) に合わせた
+  対応表。`sem_tem_example.yaml`とは異なり、装置メーカー・研究室に依存しない
+  汎用例ではなく、実際のフィールド名 (`AcceleratingVoltage(kV)`、
+  `Magnification`、`sampleID`等) をそのまま主キーとして使う。
+  - `DwellTime`/`PixelSize`は、値の文字列にもフィールド名にも単位が無く、
+    実際の単位が未確認のため`unit`を指定していない (ファイル内にコメントで
+    明記。要ユーザー確認)。
+  - `Grid`の値は共有されたスクリーンショットの文字列がドロップダウンの
+    選択肢一覧のように見え、実際に選択された1件の値かどうか未確認
+    (要ユーザー確認)。
+- Added `tests/test_yasunaga_lab_stem_field_mapping.py` (11 tests)。
+  ユーザーから共有された実際の値 (単位混在文字列を含む) をそのまま
+  `RawField`として与え、MATERIAL/CONDITION/RESULTの全20フィールドが対応表に
+  マッチすること、構造化フィールドのみでは誤って競合が検出されないこと、
+  自由記述と一致/不一致の両ケースが正しく扱われること、生成MaiMLが整形式
+  であることを確認する。公式XSDによる検証も別途実施し、MUSTレベルのエラーが
+  無いことを確認済み。
 
 ### Notes
 
@@ -145,11 +177,12 @@ All notable changes to this project are documented in this file.
   (既存の全回帰テストが変更なしで通ることを確認済み)。合成データによる
   統合テスト (`tests/test_phase5_3_end_to_end.py`) と、実際の公式XSD
   (`maiml-schema-validator`スキル同梱のスキーマ) による検証は行ったが、
-  **実際のeLabFTWサーバー・実データによる確認 (Phase 5-4) はまだ行っていない**。
-  特に次の点は実データで要確認:
-  - `field_mappings/sem_tem_example.yaml`は装置メーカー・特定研究室に依存
-    しない汎用例であり、そのまま実データの対応表には使えない (実際の
-    Custom Field名に合わせて作り直す必要がある)。
+  **実際のeLabFTWサーバーに接続した確認 (実際のREST API経由での取得) は
+  まだ行っていない**。上記「Phase 5-4」節の通り、実際のCustom Field名・値
+  (スクリーンショット共有分) を使った対応表調整と合成データでの統合テストは
+  実施済み。特に次の点は依然として要確認:
+  - `DwellTime`/`PixelSize`の実際の単位 (`yasunaga_lab_stem.yaml`では未設定)。
+  - `Grid`フィールドの値がドロップダウンの選択肢一覧なのか実際の選択値なのか。
   - eLabFTWのExtra Fieldsに値と単位が混在する問題 (例: `"200 kV"`) は
     上記「### Fixed」の単位正規化により対応済みだが、**単位換算
     (V→kV等) は初期実装のスコープ外**のため、対応表が期待する単位と

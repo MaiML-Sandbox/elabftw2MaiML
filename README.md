@@ -98,6 +98,10 @@ elabftw2maiml/
       sem_tem_example.yaml  SEM/TEM観察の汎用的な対応表の例 (SEM_TEM_field_mapping_example.md
                           10節のMVPフィールド一覧に対応。装置メーカーや特定研究室に依存しない
                           一般例であり、実運用ではフィールド名・単位を必ず調整すること)
+      yasunaga_lab_stem.yaml  YasunagaLabのSTEM実験で実際に使われているCustom Field名
+                          (MATERIAL/CONDITION/RESULTの各フィールドグループ) に合わせた
+                          対応表 (Phase 5-4)。DwellTime/PixelSizeは単位が未確定のため
+                          `unit`を指定していない (ファイル内のコメント参照)。
     profiles/
       sem_tem.py            SemTemTextRuleInterpreter (SEM/TEM固有の自由記述からの
                           加速電圧・作動距離・倍率・プローブ電流・試料傾斜角・粒径・
@@ -221,6 +225,12 @@ ExperimentDataへの反映段階でも維持しています)。
   (`reason`) が表示される (自動反映もされないが、黙って捨てられることもない)。
 - 正規化に成功した値は`InterpretationCandidate.raw_value`に元の文字列
   (例: `"200 kV"`) を保持したままなので、変換結果を後から原記録と照合できる。
+- 対応表に`unit`を指定していないフィールドでも、`data_type: number`を指定して
+  いれば数値として正規化する (例: `DwellTime`="10"、`PixelSize`="0.025"のように、
+  値に単位が含まれず対応表側でも単位が未確定のフィールド)。この場合は
+  `unit`が`None`のまま`Decimal`化されるだけで、単位の食い違いチェックは行わない。
+  `unit`も`data_type: number`も指定していないフィールド (文字列フィールドの大半)
+  は、従来通り値をそのまま (文字列として) 扱う。
 
 単位換算が必要な値 (例: `"200000 V"`を`200 kV`として扱いたい場合) は、現時点では
 対応表の`unit`と実際の入力形式を揃えるか、値の前処理を別途検討してください
