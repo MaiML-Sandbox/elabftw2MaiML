@@ -19,6 +19,7 @@ Phase 5-3 (interpretation -> ExperimentDataへの反映 -> MaiML生成) の
           自動反映される (materials への合成アイテムとして)。
 """
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -200,3 +201,102 @@ class TestApplyThenBuild:
         schema = etree.XMLSchema(etree.parse(str(SCHEMA_PATH)))
         doc = etree.fromstring(xml_bytes)
         assert schema.validate(doc), schema.error_log
+
+
+class TestRealisticStringValuesWithEmbeddedUnits:
+    """Phase 5-3 fix (単位正規化): 実際のeLabFTWのExtra Fieldsは値と単位を分けて
+    持つ仕組みが無く、"200 kV"のように単位混在の文字列で返ってくることがある
+    (実際の画面例で確認済み)。正規化を行わない場合、これは自由記述側の数値
+    (int/型)と表現が食い違い、実際に一致している値が誤って競合と判定されて
+    しまっていた。この節では、その修正が効いていることを確認する。"""
+
+    def _build(self, accelerating_voltage_raw_value, body_text):
+        experiment = ExperimentData(
+            elab_id=43,
+            title="STEM観察 (単位混在文字列テスト)",
+            date=datetime(2026, 9, 16),
+            body_text=body_text,
+        )
+        raw_fields = [
+            RawField(name="AcceleratingVoltage(kV)", value=accelerating_voltage_raw_value,
+                      group="CONDITION"),
+        ]
+        structured_candidates, unmapped = build_structured_candidates(raw_fields, FIELD_MAPPING)
+        assert unmapped == []
+
+        pipeline = InterpretationPipeline(extra_text_interpreters=[SemTemTextRuleInterpreter()])
+        report = pipeline.interpret_experiment(experiment, structured_candidates=structured_candidates)
+        return experiment, report
+
+    def test_embedded_unit_string_agrees_with_matching_free_text(self):
+        """"200 kV" (文字列) と自由記述「加速電圧200 kVで観察した」は、本来
+        一致しているはずの値。正規化前は型・表現の違いから誤って競合と判定
+        されていたが、修正後は一致として扱われ、自動反映される。"""
+        experiment, report = self._build(
+            accelerating_voltage_raw_value="200 kV",
+            body_text="加速電圧200 kVで観察した。",
+        )
+
+        assert report.conflicts == []
+        accepted = [c for c in report.accepted if c.semantic_type == "accelerating_voltage"]
+        assert len(accepted) == 1
+        assert accepted[0].value == Decimal("200")
+
+        apply_interpretation_report(experiment, report)
+        keys = {p.key: p for p in experiment.condition_properties}
+        assert "ns1:accelerating_voltage" in keys
+        assert keys["ns1:accelerating_voltage"].value == Decimal("200")
+        assert keys["ns1:accelerating_voltage"].units == "kV"
+
+    def test_embedded_unit_string_still_conflicts_with_disagreeing_free_text(self):
+        """値が実際に食い違う場合 (200 kV vs 250 kV) は、正規化後も正しく
+        競合として検出されること (正規化が食い違い検出そのものを無効化して
+        いないことの確認)。"""
+        experiment, report = self._build(
+            accelerating_voltage_raw_value="200 kV",
+            body_text="加速電圧250kVに変更して再測定した。",
+        )
+
+        conflict_types = {c.semantic_type for c in report.conflicts}
+        assert "accelerating_voltage" in conflict_types
+        accepted_types = {c.semantic_type for c in report.accepted}
+        assert "accelerating_voltage" not in accepted_types
+
+        apply_interpretation_report(experiment, report)
+        keys = {p.key for p in experiment.condition_properties}
+        assert "ns1:accelerating_voltage" not in keys
+
+    def test_dimension_mismatched_value_is_unclassified_not_falsely_matched_or_conflicted(self):
+        """"200 mA" (期待単位kVと次元が異なる) は、自由記述に何も言及が無くても
+        自動反映されず (unclassifiedに残る)、誤って「一致」とみなされたり
+        クラッシュしたりしないこと。"""
+        experiment, report = self._build(
+            accelerating_voltage_raw_value="200 mA",
+            body_text="",
+        )
+
+        assert report.conflicts == []
+        accepted_types = {c.semantic_type for c in report.accepted}
+        assert "accelerating_voltage" not in accepted_types
+        unclassified = [c for c in report.unclassified if c.semantic_type == "accelerating_voltage"]
+        assert len(unclassified) == 1
+        assert unclassified[0].raw_value == "200 mA"
+        assert unclassified[0].reason is not None
+
+        apply_interpretation_report(experiment, report)
+        assert experiment.condition_properties == []
+
+    def test_non_numeric_value_is_unclassified_and_logged_not_dropped(self):
+        """"not measured" のような非数値の値も、クラッシュせず未分類として
+        原値を保持したまま残ること。"""
+        experiment, report = self._build(
+            accelerating_voltage_raw_value="not measured",
+            body_text="",
+        )
+
+        unclassified = [c for c in report.unclassified if c.semantic_type == "accelerating_voltage"]
+        assert len(unclassified) == 1
+        assert unclassified[0].value == "not measured"
+
+        text = format_interpretation_report(report)
+        assert "not measured" in text

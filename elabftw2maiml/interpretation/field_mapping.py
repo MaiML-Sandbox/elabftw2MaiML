@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 from .conflict import InterpretationCandidate
+from .normalize import parse_numeric_with_unit
 
 Number = Union[int, float, str]
 
@@ -163,22 +164,58 @@ def candidate_from_field(
         (例:「加速電圧」フィールドが SEM/TEM 共通でも、`raw.group` や
         呼び出し側が把握しているStep種別から `sem_acquisition`/`tem_acquisition`
         を指定できる)。
+
+    単位を持つフィールド (対応表またはraw側で`unit`が指定されているもの) は、
+    競合判定の前に `interpretation.normalize.parse_numeric_with_unit()` で
+    正規化する (Phase 5-3 fix)。eLabFTWのExtra Fieldsは値と単位を分けて持つ
+    仕組みが無く、`"200 kV"`のように単位が値の文字列に混在することがあるため、
+    正規化せずに渡すと自由記述側 (数値+別属性の単位) と型・表現が食い違い、
+    実際には一致している値が誤って競合と判定されてしまう。
+
+    正規化できなかった場合 (数値として解釈できない、または対応表の期待単位と
+    次元が異なる。例: `"not measured"`や期待`kV`に対する`"200 mA"`) は、
+    値をそのまま (`raw_value`として) 保持しつつ、`role`/`target`を`None`に
+    強制する (自動反映させず、`interpretation.pipeline`の仕分けで
+    `unclassified`に回すため。黙って捨てず、原値と理由を`reason`に残す)。
     """
     rule = field_mapping.lookup(raw.name)
     if rule is None:
         return None
 
-    unit = raw.unit if raw.unit is not None else rule.unit
+    expected_unit = raw.unit if raw.unit is not None else rule.unit
+    role = role_override if role_override is not None else rule.role
+    target = rule.target
+    reason = None
+    value = raw.value
+    unit = expected_unit
+    raw_value = None
+
+    if expected_unit is not None:
+        normalized = parse_numeric_with_unit(raw.value, expected_unit=expected_unit)
+        if normalized is not None:
+            value = normalized.value
+            unit = normalized.unit
+            raw_value = normalized.raw_value
+        else:
+            role = None
+            target = None
+            raw_value = raw.value
+            reason = (
+                f"値を正規化できないため自動反映を無効化しました "
+                f"(raw_value={raw.value!r}, expected_unit={expected_unit!r})"
+            )
 
     return InterpretationCandidate(
         semantic_type=rule.semantic_type,
-        value=raw.value,
+        value=value,
         source=source,
         confidence=confidence,
         unit=unit,
         context=context_override if context_override is not None else rule.context,
-        role=role_override if role_override is not None else rule.role,
-        target=rule.target,
+        role=role,
+        target=target,
+        reason=reason,
+        raw_value=raw_value,
     )
 
 

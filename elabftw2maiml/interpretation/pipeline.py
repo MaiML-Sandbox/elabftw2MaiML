@@ -228,6 +228,10 @@ def format_interpretation_report(report: InterpretationReport) -> str:
                 detail += f", context={c.context}"
             if c.source_text:
                 detail += f", source_text={c.source_text!r}"
+            if c.raw_value is not None and c.raw_value != c.value:
+                detail += f", raw_value={c.raw_value!r}"
+            if c.reason:
+                detail += f", reason={c.reason!r}"
             detail += ")"
             lines.append(detail)
 

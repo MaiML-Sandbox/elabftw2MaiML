@@ -11,6 +11,7 @@ SEM_TEM_field_mapping_example.md の内容を素材に、以下を確認する:
   `unmapped_fields` として返すこと (design doc 15節-9)
 """
 import os
+from decimal import Decimal
 
 import pytest
 
@@ -196,6 +197,89 @@ class TestCandidateFromField:
         candidate = candidate_from_field(raw, mapping, source="field_group", confidence=0.9)
         assert candidate.source == "field_group"
         assert candidate.confidence == 0.9
+
+
+class TestCandidateFromFieldNormalization:
+    """Phase 5-3 fix: eLabFTWのExtra Fieldsが単位混在の文字列 ("200 kV"等) で
+    返ってきた場合の正規化を、`candidate_from_field()`経由で確認する
+    (normalize.pyの単体テストはtest_normalize.py、ここでは統合部分のみ)。"""
+
+    def test_value_with_embedded_unit_string_is_normalized(self):
+        mapping = _simple_mapping()
+        raw = RawField(name="加速電圧", value="200 kV")
+        candidate = candidate_from_field(raw, mapping)
+        assert candidate.value == Decimal("200")
+        assert candidate.unit == "kV"
+        assert candidate.role == "condition"
+        assert candidate.target == "condition_properties"
+        assert candidate.reason is None
+
+    def test_value_with_embedded_unit_no_space_is_normalized(self):
+        mapping = _simple_mapping()
+        raw = RawField(name="加速電圧", value="200kV")
+        candidate = candidate_from_field(raw, mapping)
+        assert candidate.value == Decimal("200")
+        assert candidate.unit == "kV"
+
+    def test_bare_numeric_string_gets_rule_unit_filled_in(self):
+        mapping = _simple_mapping()
+        raw = RawField(name="加速電圧", value="200")
+        candidate = candidate_from_field(raw, mapping)
+        assert candidate.value == Decimal("200")
+        assert candidate.unit == "kV"
+        assert candidate.role == "condition"
+
+    def test_bare_numeric_value_gets_rule_unit_filled_in(self):
+        mapping = _simple_mapping()
+        raw = RawField(name="加速電圧", value=200)
+        candidate = candidate_from_field(raw, mapping)
+        assert candidate.value == Decimal("200")
+        assert candidate.unit == "kV"
+
+    def test_dimension_mismatch_disables_auto_acceptance_but_keeps_raw_value(self):
+        """"200 mA" は期待単位"kV"と次元が異なるため、自動反映を無効化
+        (role/target=None) しつつ、原値をraw_valueに保持する。"""
+        mapping = _simple_mapping()
+        raw = RawField(name="加速電圧", value="200 mA")
+        candidate = candidate_from_field(raw, mapping)
+        assert candidate.role is None
+        assert candidate.target is None
+        assert candidate.raw_value == "200 mA"
+        assert candidate.value == "200 mA"  # 正規化できないため原値のまま
+        assert candidate.reason is not None
+        assert "200 mA" in candidate.reason
+
+    def test_non_numeric_value_disables_auto_acceptance_and_preserves_raw_value(self):
+        """"not measured" は数値として解釈できないため、自動反映を無効化しつつ
+        原値をログ (reason/raw_value/value) へ保持する。"""
+        mapping = _simple_mapping()
+        raw = RawField(name="加速電圧", value="not measured")
+        candidate = candidate_from_field(raw, mapping)
+        assert candidate.role is None
+        assert candidate.target is None
+        assert candidate.value == "not measured"
+        assert candidate.raw_value == "not measured"
+        assert candidate.reason is not None
+
+    def test_field_with_no_expected_unit_is_not_normalized(self):
+        """対応表に unit が定義されていないフィールド (文字列フィールド等) は、
+        正規化を一切行わず、既存動作 (値をそのまま使う) を維持する。"""
+        mapping = _simple_mapping()
+        raw = RawField(name="試料ID", value="S-001")
+        candidate = candidate_from_field(raw, mapping)
+        assert candidate.value == "S-001"
+        assert candidate.raw_value is None
+        assert candidate.reason is None
+        assert candidate.role == "material"
+
+    def test_raw_unit_wins_over_rule_unit_as_expected_unit(self):
+        mapping = _simple_mapping()
+        raw = RawField(name="加速電圧", value="15", unit="V")
+        candidate = candidate_from_field(raw, mapping)
+        assert candidate.value == Decimal("15")
+        assert candidate.unit == "V"
+        # rule.unitは"kV"だが、raw.unitが優先されるため次元不一致にはならない。
+        assert candidate.role == "condition"
 
 
 class TestBuildStructuredCandidates:

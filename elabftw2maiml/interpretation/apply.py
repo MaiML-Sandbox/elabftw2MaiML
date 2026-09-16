@@ -45,6 +45,7 @@ Phase 5-3: `InterpretationReport` の `accepted` 候補を、実際に `Experime
 from __future__ import annotations
 
 import re
+from decimal import Decimal
 from typing import List, Optional
 
 from ..model import ExperimentData, LinkedItem, Party, PropertyValue
@@ -76,10 +77,13 @@ def _sanitize_ncname(name: str) -> str:
 
 def _infer_xsi_type(value) -> str:
     """候補の値のPython型から、既存の型マッピング (README「カスタムフィールドの
-    型マッピング」節) と同じ考え方でxsi:typeを推定する。"""
+    型マッピング」節) と同じ考え方でxsi:typeを推定する。
+
+    `interpretation/normalize.py` (Phase 5-3 fix) による正規化後の値は
+    `Decimal` になるため、`int`/`float`と同様に数値として扱う。"""
     if isinstance(value, bool):
         return "booleanType"
-    if isinstance(value, (int, float)):
+    if isinstance(value, (int, float, Decimal)):
         return "doubleType"
     return "stringType"
 

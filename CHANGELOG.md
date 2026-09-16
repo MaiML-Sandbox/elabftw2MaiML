@@ -96,9 +96,46 @@ All notable changes to this project are documented in this file.
   いない** (既存の全回帰テストが変更なしで通ることを確認済み)。
 - Added `tests/test_apply.py` (14 tests)、
   `tests/test_raw_fields_from_metadata.py` (6 tests)、
-  `tests/test_phase5_3_end_to_end.py` (12 tests。構造化フィールドと自由記述が
+  `tests/test_phase5_3_end_to_end.py` (16 tests。構造化フィールドと自由記述が
   一部で食い違う、より実際に近いシナリオの統合テスト。生成MaiMLの整形式性・
   XSD妥当性の検証を含む)、`tests/test_cli_field_mapping.py` (3 tests)。
+
+### Fixed
+
+- Fixed structured field values with embedded units (e.g. `"200 kV"`) being
+  misdetected as conflicts against agreeing free-text values. Added
+  `elabftw2maiml/interpretation/normalize.py`
+  (`NormalizedValue`, `canonical_unit()`, `parse_numeric_with_unit()`)。
+  競合判定 (`detect_conflicts()`) の前に、構造化フィールドの値を自由記述側と
+  同じ内部表現 (数値 (`Decimal`) + 正規化後の単位) に揃える。
+  - 空白の除去 (`"200 kV"`/`"200kV"`)、µ/μ/u・°/度などの表記統一、対応表の
+    `unit`による裸数値の単位補完、同一単位での比較までをスコープとし、
+    **単位換算 (V→kV等) は初期実装では行わない** (対応表が期待する単位と
+    次元が異なる値、または数値として解釈できない値は、正規化できないものと
+    して扱う)。
+  - 正規化できなかった値は、誤って自動反映されたり誤って競合扱いされたり
+    することなく`unclassified`に残るよう、`role`/`target`を`None`にする
+    (`field_mapping.py`の`candidate_from_field()`)。元の値
+    (`InterpretationCandidate.raw_value`) と正規化できなかった理由
+    (`InterpretationCandidate.reason`) は変換実行時のレポート
+    (`format_interpretation_report()`/`format_conflict_report()`) に残し、
+    黙って捨てない。
+  - 正規化に成功した場合も、元の文字列 (例: `"200 kV"`) は`raw_value`として
+    保持し、変換結果を後から原記録と照合できるようにした。
+  - Added `tests/test_normalize.py` (23 tests)。ユーザーから提示された
+    正規化の対応表をそのまま回帰テストとして固定した。
+  - Extended `tests/test_field_mapping.py` with 8 tests
+    (`TestCandidateFromFieldNormalization`) covering embedded-unit strings,
+    no-space strings, bare numeric values/strings with unit fill-in,
+    dimension mismatches, and non-numeric values.
+  - Extended `tests/test_phase5_3_end_to_end.py` with 4 tests
+    (`TestRealisticStringValuesWithEmbeddedUnits`) covering the end-to-end
+    behavior (embedded-unit agreement, embedded-unit vs. disagreeing
+    free text, dimension mismatch, non-numeric value) including reflection
+    into `ExperimentData`.
+  - 公式XSD (`maiml-schema-validator`スキル同梱のスキーマ) による検証済み
+    (正規化後の`Decimal`値もMUSTレベルのエラーなく`doubleType`として出力
+    される)。
 
 ### Notes
 
@@ -113,11 +150,12 @@ All notable changes to this project are documented in this file.
   - `field_mappings/sem_tem_example.yaml`は装置メーカー・特定研究室に依存
     しない汎用例であり、そのまま実データの対応表には使えない (実際の
     Custom Field名に合わせて作り直す必要がある)。
-  - eLabFTWのExtra Fieldsは値と単位を分けて持つ仕組みが無いため、値の文字列に
-    単位が混在している場合 (例: `"200 kV"`) に、自由記述からの抽出値
-    (単位を除いた数値のみ) と型・表現が一致せず、意図せず「競合」として
-    検出される可能性がある (README「対応表による構造化フィールド・自由記述の
-    統合」節の既知の制約を参照)。
+  - eLabFTWのExtra Fieldsに値と単位が混在する問題 (例: `"200 kV"`) は
+    上記「### Fixed」の単位正規化により対応済みだが、**単位換算
+    (V→kV等) は初期実装のスコープ外**のため、対応表が期待する単位と
+    実際の入力形式 (例: `"200000 V"`) が異なる場合は依然として自動反映
+    されない (`unclassified`に残る)。実データで、対応表の`unit`と実際の
+    入力形式が一致しているか確認する必要がある。
 - SEM/TEM第2段階の意味種別 (pixel_size/dwell_time/chamber_pressure/defocus/
   electron_dose/objective_aperture/selected_area_aperture/膜厚・薄片厚さ・
   空孔径等) は、実際の自由記述の表記ゆれを収集してから追加する。

@@ -35,6 +35,7 @@ from .field_mapping import (
 )
 from .profiles import SemTemTextRuleInterpreter, SEM_TEM_PHASE1_SEMANTIC_TYPES
 from .apply import apply_interpretation_report
+from .normalize import NormalizedValue, parse_numeric_with_unit, canonical_unit
 
 __all__ = [
     "InterpretationResult",
@@ -67,4 +68,7 @@ __all__ = [
     "SemTemTextRuleInterpreter",
     "SEM_TEM_PHASE1_SEMANTIC_TYPES",
     "apply_interpretation_report",
+    "NormalizedValue",
+    "parse_numeric_with_unit",
+    "canonical_unit",
 ]
