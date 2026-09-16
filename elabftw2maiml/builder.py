@@ -22,8 +22,12 @@ ExperimentData (eLabFTWから取得したデータ) -> MaiML <maiml> ルート�
   conditionTemplate    = 実験のExtra Fields (カスタムフィールド) をまとめて1つ。最初のSTEPが消費する。
   resultTemplate        = STEPごとに1つ作成する (MaiMLの一般的な考え方: 各STEPがmaterial/condition/resultを
                           持つ、というモデルに準拠)。
-                            - 最初のSTEP(R1): templateRefでmaterialTemplate(M1)を参照。汎用データコンテナなし
-                              (実データは既にM1側にあるため)
+                            - 最初のSTEP(R1): templateRefは持たない。M1(materialTemplate)からの入力は
+                              pnml上のarc (p_material_in -> transition -> p_result_out) と、双方が
+                              同じplaceRefを共有することで表現済みであり、templateRefで
+                              materialTemplateを指すとMaiML標準の「templateRefは同種の要素同士のみ
+                              参照可」という制約に反するため (resultTemplate.templateRefは
+                              resultTemplateのみを参照できる)。
                             - 途中のSTEP: templateRefでR1を参照 (前STEPの結果を入力材料として引き継ぐ、
                               というMaiMLの一般的な考え方の簡易実装)。汎用データコンテナは持たない
                               (参照先の情報を自動継承するため)
@@ -32,7 +36,8 @@ ExperimentData (eLabFTWから取得したデータ) -> MaiML <maiml> ルート�
 
   data/results/material/condition/result
                        = 上記テンプレートに対応する実測値インスタンス。resultは同じ接続パターンを
-                         instanceRef (templateRefのインスタンス層版) で反映する。
+                         instanceRef (templateRefのインスタンス層版) で反映する (最初のSTEPは
+                         instanceRefも持たない。理由はresultTemplateと同様)。
 
   eventLog             = 各StepについてSTART/COMPLETEイベントを記録。
                           結果を記録した最終Stepのイベントに resultsRef を付与し、
@@ -50,7 +55,8 @@ from .model import ExperimentData, Party, PropertyValue, LinkedItem, Step
 from .uuids import new_uuid, named_uuid
 
 VENDOR_KEY = ("elabftw-vendor", "deltablot")
-CREATOR_SOFTWARE_VERSION = "1.0.0"  # このコンバータ自体のバージョン。上げたらUUIDが変わる。
+CREATOR_SOFTWARE_VERSION = "0.2.0"  # このコンバータ自体のバージョン (プロジェクトのリリース番号と一致させる)。
+                                     # 上げたらMaiML内の「変換ソフトウェア」エンティティのUUIDが変わる。
 
 
 def _dt(value: Optional[datetime]) -> str:
@@ -243,10 +249,9 @@ class MaimlBuilder:
                 mx.ref_el("placeRef", p_material_in, f"pref_mat_{item.elab_id}"),
                 id=tmpl_id,
             ))
-        # チェーンの起点 (最初のSTEPのresultTemplate=R1がtemplateRefで指す先)
-        first_material_template_id = material_template_ids[0]
         # (2つ目以降のSTEPはmaterialTemplateを作らず、最初のSTEPのresultTemplate(R1)への
-        #  templateRefで入力材料を引き継ぐ)
+        #  templateRefで入力材料を引き継ぐ。M1自体への参照は、最初のSTEPのresultTemplateでは
+        #  templateRefとして持たず、pnmlのarcと共有placeRefで表現する)
 
         cond_tmpl_id = f"condtmpl_exp{exp.elab_id}"
         cond_props = [_property_from_pv(p) for p in exp.condition_properties]
@@ -258,8 +263,12 @@ class MaimlBuilder:
         )
 
         # resultTemplate: STEPごとに1つ作る。
-        #   - 最初のSTEP: templateRefで materialTemplate(M1) を参照。汎用データコンテナなし
-        #     (実データはM1側が既に持っているため、R1は参照のみ)
+        #   - 最初のSTEP: templateRefを持たない。M1(materialTemplate)からの入力はpnmlのarc
+        #     (p_material_in -> transition -> p_result_out) と、双方が同じ場所(place)を
+        #     参照していることで既に表現されている。templateRefでmaterialTemplateを直接
+        #     参照すると、「resultTemplate.templateRefはresultTemplateのみを参照できる」
+        #     というMaiML標準の制約(共通指示書4.2/5.1、REF-02)に反するため、
+        #     ここでは意図的に templateRef を省略する (templateRef はminOccurs=0=任意要素)。
         #   - 途中のSTEP: templateRefで最初のSTEPのresultTemplate(R1)を参照。汎用データコンテナなし
         #     (M1をそのまま参照として引き継ぐ、という位置づけをR1経由で表現する)
         #   - 最後のSTEP: templateRefで直前のSTEPのresultTemplateを参照。
@@ -277,8 +286,8 @@ class MaimlBuilder:
             is_last = (i == n_steps - 1)
 
             if is_first:
-                # 最初のSTEP -> materialTemplate(M1)へ
-                template_ref_el = mx.ref_el("templateRef", first_material_template_id, f"tref_{tmpl_id}")
+                # 最初のSTEP -> templateRefなし (pnmlのarcで既に表現されているため)
+                template_ref_el = None
             elif not is_last:
                 # 途中のSTEP -> 最初のSTEPのresultTemplate(R1)へ
                 template_ref_el = mx.ref_el("templateRef", first_result_template_id, f"tref_{tmpl_id}")
@@ -294,7 +303,8 @@ class MaimlBuilder:
 
             children = list(content_children)
             children.append(mx.ref_el("placeRef", step_output_place[step_key], f"pref_res_{step_key}"))
-            children.append(template_ref_el)
+            if template_ref_el is not None:
+                children.append(template_ref_el)
 
             result_templates.append(mx.E("resultTemplate", *children, id=tmpl_id))
             step_result_template_ids.append((step_key, tmpl_id))
@@ -348,8 +358,6 @@ class MaimlBuilder:
                 id=inst_id,
                 ref=tmpl_id,
             ))
-        first_material_instance_id = material_instance_ids[0]
-
         cond_props = [_property_from_pv(p) for p in exp.condition_properties]
         condition_instance = mx.E(
             "condition",
@@ -359,7 +367,9 @@ class MaimlBuilder:
         )
 
         # result: STEPごとに1つ、対応するresultTemplateと同じ接続パターンをinstanceRefで反映する。
-        #   - 最初のSTEP: instanceRefでmaterialインスタンス(M1)を参照。汎用データコンテナなし
+        #   - 最初のSTEP: instanceRefを持たない (resultTemplate側と同じ理由。result.instanceRefは
+        #     同種のresultのみ参照可であり、materialインスタンスは参照できないため。
+        #     M1からの入力はpnmlのarcと共有placeRefで既に表現されている)
         #   - 途中のSTEP: instanceRefで最初のSTEPのresultインスタンス(R1)を参照。汎用データコンテナなし
         #   - 最後のSTEP: instanceRefで直前のSTEPのresultインスタンスを参照。実データを保持
         result_instances = []
@@ -372,7 +382,7 @@ class MaimlBuilder:
             is_last = (i == n_steps - 1)
 
             if is_first:
-                instance_ref_el = mx.ref_el("instanceRef", first_material_instance_id, f"iref_{inst_id}")
+                instance_ref_el = None
             elif not is_last:
                 instance_ref_el = mx.ref_el("instanceRef", first_result_instance_id, f"iref_{inst_id}")
             else:
@@ -389,7 +399,8 @@ class MaimlBuilder:
                 content_children = mx.global_content(new_uuid())
 
             children = list(content_children)
-            children.append(instance_ref_el)
+            if instance_ref_el is not None:
+                children.append(instance_ref_el)
 
             result_instances.append(mx.E("result", *children, id=inst_id, ref=tmpl_id))
             if is_first:

@@ -216,3 +216,14 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# scratch files from remote file transfers (should not normally appear, but ignore just in case)
+*.b64
+
+# ローカルでの実サーバー疎通テスト用フォルダ (APIキー等の接続情報や、実際の
+# eLabFTWデータから生成した.maimlが置かれるため、リポジトリには含めない)
+localtests/
+commandAttr.json
+
+# macOS
+.DS_Store

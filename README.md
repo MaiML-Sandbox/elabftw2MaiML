@@ -1,5 +1,7 @@
 # elabftw2maiml
 
+**バージョン: v0.2.0** (変更履歴は [CHANGELOG.md](./CHANGELOG.md) を参照)
+
 eLabFTW (REST API v2 / `elabapi-python`) の実験データを、JIS K 0200 (MaiML v1.0) 形式の
 `.maiml` ファイルに変換するツールです。
 
@@ -75,8 +77,15 @@ elabftw2maiml/
   maiml_xml.py        MaiML要素の低レベル構築 (property/content/globalObjectContentGroup等)
   builder.py          ExperimentData -> <maiml> ルート要素の組み立て
   elabftw_client.py   elabapi-python でeLabFTWから取得 -> ExperimentDataへ変換
+  interpretation/      構造情報・自由記述からの判定ロジック (elabftw_client.pyから分離)
+    model.py            判定結果モデル (InterpretationResult: role/confidence/source/reason)
+    structured.py        StructuredRuleInterpreter (Category/Tag/Custom Field GroupからのRole判定)
+    text.py              TextRuleInterpreter (自由記述からの温度/時間/質量/体積/回転数/pH抽出)
+    conflict.py          InterpretationCandidate/Conflict (構造化情報と自由記述の値の突き合わせ)
+    policy.py             情報源ごとのconfidenceポリシー (DEFAULT_SOURCE_CONFIDENCE等)
 elabftw_to_maiml.py    CLIエントリポイント
 test_build_and_validate.py  合成データでのビルド+XSD検証テスト（実行には"./schema/"が必要）
+tests/                 pytestによる回帰テスト・単体テスト (詳細は下記「テスト」参照)
 ```
 
 ## セットアップ
@@ -126,6 +135,60 @@ python elabftw_to_maiml.py \
 ```
 
 (`--host`/`--api-key`は環境変数で渡せば省略可)
+
+## テスト
+
+実際のeLabFTWサーバーに接続せず、合成 (synthetic) フィクスチャに対して
+`elabftw_client.py`/`builder.py` の変換ロジックを検証する回帰テスト一式を
+`tests/` に用意している。
+
+```bash
+pip install pytest
+python -m pytest tests/
+```
+
+- `tests/fixtures.py`: `elabapi_python` のSDKモデルを実際に呼び出さず、
+  `ElabftwClient` が参照する属性だけを持つ合成データ (Category/Tag/Custom Field
+  Groupによる役割判定、ネストしたリンクアイテム、Steps、添付ファイルなどを網羅) を用意する。
+- `tests/test_regression_experiment_data.py`: `fetch_experiment()` が返す
+  `ExperimentData` が `tests/golden/experiment_data_*.json` と一致することを確認する
+  (Group/Tag/Categoryによる役割判定、Custom Fieldの型変換などが変化していないことの保証)。
+- `tests/test_regression_maiml_build.py`: `ExperimentData` から生成される MaiML
+  (`.maiml`) が `tests/golden/*.maiml` と一致すること (UUID採番は決定論的な値に
+  差し替えて比較)、生成XMLが整形式であること、`schemas/maiml.xsd` が存在する場合は
+  それに対して妥当であることを確認する (XSDが無い環境では該当テストをスキップする)。
+- `tests/generate_golden.py`: 判定ロジックやMaiML組み立てロジックを**意図的に**
+  変更し、新しい出力を今後の回帰テストの基準として採用したい場合にのみ、変更内容を
+  レビューした上で `python -m tests.generate_golden` として実行する
+  (通常のテスト実行では使わない)。
+- `tests/test_text_rule_interpreter.py`: `TextRuleInterpreter` (自由記述からの
+  温度・時間・質量・体積・回転数・pH抽出) の単体テスト。development planの
+  worked example (「40 ℃で30分加熱した。」) を含む。
+  **注意**: `TextRuleInterpreter` は現時点では単体で完結しており、
+  `fetch_experiment()`/`ExperimentData`/MaiML出力にはまだ接続していない
+  (development planのPhase 4「競合検出」・Phase 5「MaiML出力との接続」で
+  今後つなぎ込む予定)。
+- `tests/test_conflict.py`: `InterpretationCandidate`/`Conflict`/
+  `detect_conflicts()`/`format_conflict_report()` の単体テスト。development
+  planの例 (カスタムフィールド: Temperature=50℃ / 自由記述: 40℃で30分加熱した。
+  が競合として検出されること) を含む。
+  **注意**: こちらも現時点では汎用の突き合わせロジックのみを提供する単体の
+  コンポーネントであり、実際のeLabFTWカスタムフィールドをどの意味種別
+  (temperature/duration/...) に対応付けるかの判断はまだ行っていない
+  (フィールド名からの自動対応付けは、実運用でのフィールド命名を確認した上で
+  別途検討する)。
+- `tests/test_policy.py`: `policy.py` (`DEFAULT_SOURCE_CONFIDENCE`/
+  `candidate_from_extracted_value()`/`candidate_confidence_for_source()`) の
+  単体テスト。`ExtractedValue.confidence` (抽出ルールの一致確実性。正規表現が
+  一致すれば常に1.0のまま変更しない) と `InterpretationCandidate.confidence`
+  (MaiMLへの採用候補としての確度。情報源ごとのポリシーから決める。
+  `custom_field`等は1.0、`free_text_regex`は暫定的に0.95) が別レイヤーである
+  ことの確認、および両者の積として候補のconfidenceが計算されることを検証する。
+- `tests/test_interpretation_scenarios.py`: リリース時の基準ケースとして固定する
+  3パターン ((1) 構造化フィールドのみ、(2) 自由記述のみ、(3) 構造化フィールドと
+  自由記述が矛盾する場合) を、`TextRuleInterpreter.extract()` ->
+  `candidate_from_extracted_value()` -> `detect_conflicts()` という実際の
+  呼び出し順序で通し、組み合わせたときの挙動を今後の回帰基準として固定する。
 
 ## マッピング設計 (eLabFTW -> MaiML)
 

@@ -23,6 +23,12 @@ import elabapi_python
 from elabapi_python.rest import ApiException
 
 from .model import ExperimentData, Party, PropertyValue, LinkedItem, Step, FileRef
+from .interpretation import (
+    StructuredRuleInterpreter,
+    DEFAULT_ROLE_CATEGORY_CANDIDATES,
+    DEFAULT_ROLE_TAG_CANDIDATES,
+    DEFAULT_FIELD_GROUP_CANDIDATES,
+)
 
 # eLabFTWのカスタムフィールド type -> MaiMLのxsi:type マッピング。
 # 未知のtypeは stringType にフォールバックする。
@@ -48,34 +54,11 @@ _EXTRA_FIELD_TYPE_MAP = {
 DEFAULT_CREATOR_FIELD_CANDIDATES = ["使用装置", "使用機器", "装置", "機器", "Instrument", "Equipment", "Device"]
 DEFAULT_VENDOR_FIELD_CANDIDATES = ["装置メーカー", "メーカー", "製造元", "Vendor", "Manufacturer"]
 
-# リンクされたアイテム (items_links) を、カテゴリ名・タグの文字列から
-# material/condition/result/creator/instrument/vendor のいずれの役割として扱うか判定する際の
-# 既定候補文字列 (大文字小文字を区別せず部分一致)。
-# 優先順位は _ROLE_PRIORITY の順 (先に一致した役割が採用される)。一致しなければ "material"。
-DEFAULT_ROLE_CATEGORY_CANDIDATES = {
-    "creator": ["Creator", "作成者", "使用装置", "使用機器"],
-    "vendor": ["Vendor", "メーカー", "製造元", "Manufacturer"],
-    "condition": ["Conditions", "Condition", "条件"],
-    "result": ["Results", "Result", "結果"],
-    "instrument": ["Resources", "Resource", "Equipment", "装置", "機器", "Instrument"],
-    "material": ["Consumables", "Samples", "Sample", "試料", "材料", "Material"],
-}
-DEFAULT_ROLE_TAG_CANDIDATES = {k: list(v) for k, v in DEFAULT_ROLE_CATEGORY_CANDIDATES.items()}
-# 一致判定を試みる順序 (material以外を先に判定し、どれにも当てはまらなければmaterial扱いにする)
-_ROLE_PRIORITY = ["creator", "vendor", "condition", "result", "instrument", "material"]
-
-# eLabFTWの「カスタムフィールドのグループ化」機能 (CUSTOM FIELDS > MATERIAL/CONDITION/... の
-# ように折りたたみグループを作れる機能) で使われるグループ名から、
-# material/condition/result のどの役割として扱うかを判定する際の既定候補
-# (大文字小文字を区別せず部分一致)。これはリンクされたアイテムのカテゴリ/タグ判定とは別の仕組みで、
-# 実験"自身"のカスタムフィールドに対して適用される。どれにも一致しないグループ (グループ無し含む)
-# のフィールドは既定で "condition" として扱う (従来の挙動と互換)。
-DEFAULT_FIELD_GROUP_CANDIDATES = {
-    "material": ["MATERIAL", "材料", "試料", "Sample"],
-    "result": ["RESULT", "RESULTS", "結果"],
-    # "condition" は明示候補を指定しなくても、どれにも一致しない場合のフォールバック先になる
-}
-_FIELD_GROUP_ROLE_PRIORITY = ["material", "result"]  # 先に一致した方が採用され、どちらにも該当しなければ"condition"
+# 役割 (material/condition/result/creator/instrument/vendor) 判定の既定候補・
+# 優先順位・判定ロジックは interpretation/structured.py の StructuredRuleInterpreter /
+# DEFAULT_ROLE_CATEGORY_CANDIDATES / DEFAULT_ROLE_TAG_CANDIDATES /
+# DEFAULT_FIELD_GROUP_CANDIDATES へ移設した (elabftw2MaiML_phase1_development_plan.md 7節)。
+# 後方互換のため、これらの名前は上のimport文で再エクスポートしている。
 
 _TAG_RE = re.compile(r"<[^>]+>")
 
@@ -183,20 +166,6 @@ def _normalize_field_groups(metadata) -> dict:
     return {}
 
 
-def _classify_field_group_role(group_name: Optional[str], field_group_candidates: dict) -> str:
-    """
-    グループ名の文字列から material/result のどちらかに該当するか判定する。
-    大文字小文字を区別せず部分一致。どちらにも該当しない (グループ無し含む) 場合は "condition"。
-    """
-    if group_name:
-        low = group_name.lower()
-        for role in _FIELD_GROUP_ROLE_PRIORITY:
-            candidates = field_group_candidates.get(role, [])
-            if any(c.lower() in low for c in candidates):
-                return role
-    return "condition"
-
-
 class _ExtraField:
     """_normalize_extra_fields() が返す辞書の値 (dict) を、既存コードの
     `field.type` / `field.value` / `field.description` という属性アクセスの
@@ -233,6 +202,10 @@ class ElabftwClient:
         self.items_api = elabapi_python.ItemsApi(api_client)
         self.uploads_api = elabapi_python.UploadsApi(api_client)
         self.users_api = elabapi_python.UsersApi(api_client)
+
+        # 構造情報 (Category/Tag/Custom Field Group) による役割判定は
+        # interpretation/structured.py の StructuredRuleInterpreter に委譲する。
+        self._structured_interpreter = StructuredRuleInterpreter()
 
     # -- 個別要素の変換 ----------------------------------------------------
 
@@ -276,9 +249,6 @@ class ElabftwClient:
         グループ名がどの候補にも一致しない場合 (グループ無しのフィールドも含む) は
         "condition" として扱う (従来の挙動と互換)。
         """
-        candidates = dict(DEFAULT_FIELD_GROUP_CANDIDATES)
-        if field_group_candidates:
-            candidates.update(field_group_candidates)
         exclude_names = exclude_names or set()
         result = {"material": [], "condition": [], "result": []}
 
@@ -292,7 +262,8 @@ class ElabftwClient:
                 continue
             field = _ExtraField(field_dict)
             group_name = group_names.get(field.group_id) if field.group_id is not None else None
-            role = _classify_field_group_role(group_name, candidates)
+            role = self._structured_interpreter.classify_field_group_role(
+                group_name, field_group_candidates).role
 
             xsi_type = _EXTRA_FIELD_TYPE_MAP.get(field.type, "stringType")
             key = f"{ns_prefix}:{_sanitize_ncname(field_name)}"
@@ -376,30 +347,6 @@ class ElabftwClient:
             print(f"  [警告] {resource_path} のJSON解析に失敗しました: {e}")
             return None
 
-    def _classify_role(self, category_title: Optional[str], tags: Optional[str],
-                        category_candidates: dict, tag_candidates: dict) -> str:
-        """
-        リンクされたアイテムのカテゴリ名・タグ文字列から、material/condition/result/
-        creator/instrument/vendor のどの役割として扱うかを判定する。
-        大文字小文字を区別せず部分一致で判定し、_ROLE_PRIORITY の順に調べる。
-        どれにも該当しなければ "material" とみなす (従来の既定動作と互換)。
-        """
-        haystacks = []
-        if category_title:
-            haystacks.append(category_title.lower())
-        if tags:
-            haystacks.extend(t.strip().lower() for t in re.split(r"[,|]", tags) if t.strip())
-
-        for role in _ROLE_PRIORITY:
-            if role == "material":
-                continue  # materialは最後にフォールバックとして扱う
-            cat_cands = category_candidates.get(role, [])
-            tag_cands = tag_candidates.get(role, [])
-            for h in haystacks:
-                if any(c.lower() in h for c in cat_cands) or any(c.lower() in h for c in tag_cands):
-                    return role
-        return "material"
-
     def _fetch_linked_items(self, experiment, ns_prefix: str,
                              role_category_candidates: Optional[dict] = None,
                              role_tag_candidates: Optional[dict] = None,
@@ -421,13 +368,6 @@ class ElabftwClient:
         振り分ける (max_depth階層まで)。同じアイテムを2度たどらないよう訪問済みIDを記録し、
         循環参照があっても無限ループにならないようにしている。
         """
-        category_candidates = dict(DEFAULT_ROLE_CATEGORY_CANDIDATES)
-        if role_category_candidates:
-            category_candidates.update(role_category_candidates)
-        tag_candidates = dict(DEFAULT_ROLE_TAG_CANDIDATES)
-        if role_tag_candidates:
-            tag_candidates.update(role_tag_candidates)
-
         buckets = {"material": [], "condition": [], "result": [], "creator": [], "instrument": [], "vendor": []}
         visited: set = set()
 
@@ -446,7 +386,8 @@ class ElabftwClient:
                     raw_tags = raw_item.get("tags")
 
                 category_title = getattr(link, "category_title", None)
-                role = self._classify_role(category_title, raw_tags, category_candidates, tag_candidates)
+                role = self._structured_interpreter.classify_linked_item_role(
+                    category_title, raw_tags, role_category_candidates, role_tag_candidates).role
                 indent = "  " * (depth + 1)
                 origin = f" (#{parent_title}にリンクされたリソース)" if parent_title else ""
                 print(f"{indent}[情報] リンクされたアイテム #{entityid} ({link.title}){origin} を"
