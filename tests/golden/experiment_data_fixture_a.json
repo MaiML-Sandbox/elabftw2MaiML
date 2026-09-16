@@ -1,0 +1,180 @@
+{
+  "elab_id": 123,
+  "title": "PMMA薄膜のFT-IR測定",
+  "date": "2026-07-20T09:00:00",
+  "body_text": "PMMA薄膜サンプルのFT-IRスペクトルを測定した。",
+  "owner": {
+    "key": "elabftw-user-42@https://elab.example.org",
+    "name": "Yamada Taro",
+    "description": null
+  },
+  "creator": {
+    "key": "elabftw-device:FT-IR IRAffinity-1S",
+    "name": "FT-IR IRAffinity-1S",
+    "description": null
+  },
+  "vendor": {
+    "key": "elabftw-device-vendor:Shimadzu",
+    "name": "Shimadzu",
+    "description": null
+  },
+  "instruments": [
+    {
+      "key": "elabftw-instrument:IRAffinity-1S",
+      "name": "IRAffinity-1S",
+      "description": null
+    },
+    {
+      "key": "elabftw-instrument:検出器ユニット",
+      "name": "検出器ユニット",
+      "description": null
+    }
+  ],
+  "steps": [
+    {
+      "elab_id": 501,
+      "title": "サンプル準備",
+      "body": "サンプル準備",
+      "started_at": null,
+      "finished_at": "2026-07-20T09:20:00",
+      "is_finished": true
+    },
+    {
+      "elab_id": 502,
+      "title": "FT-IR測定",
+      "body": "FT-IR測定",
+      "started_at": null,
+      "finished_at": "2026-07-20T09:45:00",
+      "is_finished": true
+    }
+  ],
+  "materials": [
+    {
+      "elab_id": 88,
+      "title": "PMMAサンプル",
+      "category": "Samples",
+      "properties": [
+        {
+          "key": "ns1:SampleID",
+          "xsi_type": "stringType",
+          "value": "SA-001",
+          "values": null,
+          "description": null,
+          "format_string": null,
+          "units": null,
+          "scale_factor": null
+        },
+        {
+          "key": "ns1:Thickness",
+          "xsi_type": "doubleType",
+          "value": "0.125",
+          "values": null,
+          "description": null,
+          "format_string": null,
+          "units": null,
+          "scale_factor": null
+        }
+      ]
+    },
+    {
+      "elab_id": 0,
+      "title": "PMMA薄膜のFT-IR測定",
+      "category": "(experiment own MATERIAL fields)",
+      "properties": [
+        {
+          "key": "ns1:SampleNote",
+          "xsi_type": "stringType",
+          "value": "室温保管",
+          "values": null,
+          "description": null,
+          "format_string": null,
+          "units": null,
+          "scale_factor": null
+        }
+      ]
+    }
+  ],
+  "condition_properties": [
+    {
+      "key": "ns1:Resolution",
+      "xsi_type": "doubleType",
+      "value": "4.00",
+      "values": null,
+      "description": null,
+      "format_string": null,
+      "units": null,
+      "scale_factor": null
+    },
+    {
+      "key": "ns1:Scans",
+      "xsi_type": "doubleType",
+      "value": "32",
+      "values": null,
+      "description": null,
+      "format_string": null,
+      "units": null,
+      "scale_factor": null
+    },
+    {
+      "key": "ns1:Humidity",
+      "xsi_type": "doubleType",
+      "value": "45",
+      "values": null,
+      "description": null,
+      "format_string": null,
+      "units": null,
+      "scale_factor": null
+    }
+  ],
+  "result_properties": [
+    {
+      "key": "ns1:experimentBody",
+      "xsi_type": "stringType",
+      "value": "PMMA薄膜サンプルのFT-IRスペクトルを測定した。",
+      "values": null,
+      "description": null,
+      "format_string": null,
+      "units": null,
+      "scale_factor": null
+    },
+    {
+      "key": "ns1:tags",
+      "xsi_type": "stringType",
+      "value": "FTIR,polymer",
+      "values": null,
+      "description": null,
+      "format_string": null,
+      "units": null,
+      "scale_factor": null
+    },
+    {
+      "key": "ns1:AnalysisSummary",
+      "xsi_type": "stringType",
+      "value": "良好な吸収ピークを確認",
+      "values": null,
+      "description": null,
+      "format_string": null,
+      "units": null,
+      "scale_factor": null
+    },
+    {
+      "key": "ns1:resultItem",
+      "xsi_type": "stringType",
+      "value": "分析結果まとめ",
+      "values": null,
+      "description": null,
+      "format_string": null,
+      "units": null,
+      "scale_factor": null
+    }
+  ],
+  "uploads": [
+    {
+      "filename": "spectrum.csv",
+      "uri": "https://elab.example.org/app/download.php?f=abc123_spectrum.csv&name=spectrum.csv",
+      "hash_b64": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+      "hash_method": "SHA256"
+    }
+  ],
+  "elab_url": "https://elab.example.org/experiments.php?mode=view&id=123"
+}

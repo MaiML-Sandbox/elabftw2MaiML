@@ -1,0 +1,234 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<maiml xmlns="http://www.maiml.org/schemas" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:ns1="https://example.org/maiml/mylab" xmlns:concept="http://www.xes-standard.org/concept.xesext#" xmlns:lifecycle="http://www.xes-standard.org/lifecycle.xesext#" xmlns:time="http://www.xes-standard.org/time.xesext#" version="1.0" features="nested-attributes" xsi:type="maimlRootType">
+  <document id="document_exp123">
+    <uuid>00000000-0000-4000-8000-000000000001</uuid>
+    <description>PMMA薄膜のFT-IR測定</description>
+    <creator id="creator_instrument">
+      <uuid>f038084c-c7c1-5ed9-b04f-70dd5d5028f4</uuid>
+      <description>FT-IR IRAffinity-1S</description>
+      <vendorRef id="vref_creator" ref="vendor_of_creator"/>
+      <instrumentRef id="iref_creator_1" ref="instrument_1"/>
+      <instrumentRef id="iref_creator_2" ref="instrument_2"/>
+    </creator>
+    <vendor id="vendor_of_creator">
+      <uuid>490fe155-fb98-5481-ba4c-aca86689e156</uuid>
+      <description>Shimadzu</description>
+    </vendor>
+    <owner id="owner_experiment">
+      <uuid>a33673a1-3c11-5c3e-9f77-4bacf88112d2</uuid>
+      <description>Yamada Taro</description>
+    </owner>
+    <instrument id="instrument_1">
+      <uuid>bc8211e6-a0c3-583f-a5dd-1c57adabb9c5</uuid>
+      <description>IRAffinity-1S</description>
+    </instrument>
+    <instrument id="instrument_2">
+      <uuid>d9ce06f5-32ed-53c8-a232-18277e4aab1f</uuid>
+      <description>検出器ユニット</description>
+    </instrument>
+    <date>2026-07-20T09:00:00+00:00</date>
+  </document>
+  <protocol id="protocol_exp123">
+    <uuid>00000000-0000-4000-8000-000000000012</uuid>
+    <method id="method_exp123">
+      <uuid>00000000-0000-4000-8000-000000000011</uuid>
+      <description>PMMA薄膜のFT-IR測定</description>
+      <pnml id="pnml_exp123">
+        <uuid>00000000-0000-4000-8000-000000000004</uuid>
+        <place id="p_material_in"/>
+        <place id="p_condition_in"/>
+        <place id="p_mid_501"/>
+        <place id="p_result_out"/>
+        <transition id="t_step_501"/>
+        <transition id="t_step_502"/>
+        <arc id="a1" source="p_material_in" target="t_step_501"/>
+        <arc id="a2" source="p_condition_in" target="t_step_501"/>
+        <arc id="a3" source="t_step_501" target="p_mid_501"/>
+        <arc id="a4" source="p_mid_501" target="t_step_502"/>
+        <arc id="a5" source="t_step_502" target="p_result_out"/>
+      </pnml>
+      <program id="prog_exp123">
+        <uuid>00000000-0000-4000-8000-000000000010</uuid>
+        <instruction id="instr_step_501">
+          <uuid>00000000-0000-4000-8000-000000000002</uuid>
+          <description>サンプル準備</description>
+          <transitionRef id="tref_t_step_501" ref="t_step_501"/>
+        </instruction>
+        <instruction id="instr_step_502">
+          <uuid>00000000-0000-4000-8000-000000000003</uuid>
+          <description>FT-IR測定</description>
+          <transitionRef id="tref_t_step_502" ref="t_step_502"/>
+        </instruction>
+        <materialTemplate id="mattmpl_88">
+          <uuid>00000000-0000-4000-8000-000000000005</uuid>
+          <description>PMMAサンプル</description>
+          <property key="ns1:SampleID" xsi:type="stringType">
+            <value>SA-001</value>
+          </property>
+          <property key="ns1:Thickness" xsi:type="doubleType">
+            <value>0.125</value>
+          </property>
+          <placeRef id="pref_mat_88" ref="p_material_in"/>
+        </materialTemplate>
+        <materialTemplate id="mattmpl_0">
+          <uuid>00000000-0000-4000-8000-000000000006</uuid>
+          <description>PMMA薄膜のFT-IR測定</description>
+          <property key="ns1:SampleNote" xsi:type="stringType">
+            <value>室温保管</value>
+          </property>
+          <placeRef id="pref_mat_0" ref="p_material_in"/>
+        </materialTemplate>
+        <conditionTemplate id="condtmpl_exp123">
+          <uuid>00000000-0000-4000-8000-000000000007</uuid>
+          <property key="ns1:Resolution" xsi:type="doubleType">
+            <value>4.00</value>
+          </property>
+          <property key="ns1:Scans" xsi:type="doubleType">
+            <value>32</value>
+          </property>
+          <property key="ns1:Humidity" xsi:type="doubleType">
+            <value>45</value>
+          </property>
+          <placeRef id="pref_cond" ref="p_condition_in"/>
+        </conditionTemplate>
+        <resultTemplate id="restmpl_step_501">
+          <uuid>00000000-0000-4000-8000-000000000008</uuid>
+          <placeRef id="pref_res_501" ref="p_mid_501"/>
+        </resultTemplate>
+        <resultTemplate id="restmpl_step_502">
+          <uuid>00000000-0000-4000-8000-000000000009</uuid>
+          <property key="ns1:experimentBody" xsi:type="stringType">
+            <value>PMMA薄膜サンプルのFT-IRスペクトルを測定した。</value>
+          </property>
+          <property key="ns1:tags" xsi:type="stringType">
+            <value>FTIR,polymer</value>
+          </property>
+          <property key="ns1:AnalysisSummary" xsi:type="stringType">
+            <value>良好な吸収ピークを確認</value>
+          </property>
+          <property key="ns1:resultItem" xsi:type="stringType">
+            <value>分析結果まとめ</value>
+          </property>
+          <placeRef id="pref_res_502" ref="p_result_out"/>
+          <templateRef id="tref_restmpl_step_502" ref="restmpl_step_501"/>
+        </resultTemplate>
+      </program>
+    </method>
+  </protocol>
+  <data id="data_exp123">
+    <uuid>00000000-0000-4000-8000-000000000019</uuid>
+    <results id="results_exp123">
+      <uuid>00000000-0000-4000-8000-000000000018</uuid>
+      <material id="material_88" ref="mattmpl_88">
+        <uuid>00000000-0000-4000-8000-000000000013</uuid>
+        <description>PMMAサンプル</description>
+        <property key="ns1:SampleID" xsi:type="stringType">
+          <value>SA-001</value>
+        </property>
+        <property key="ns1:Thickness" xsi:type="doubleType">
+          <value>0.125</value>
+        </property>
+      </material>
+      <material id="material_0" ref="mattmpl_0">
+        <uuid>00000000-0000-4000-8000-000000000014</uuid>
+        <description>PMMA薄膜のFT-IR測定</description>
+        <property key="ns1:SampleNote" xsi:type="stringType">
+          <value>室温保管</value>
+        </property>
+      </material>
+      <condition id="condition_exp123" ref="condtmpl_exp123">
+        <uuid>00000000-0000-4000-8000-000000000015</uuid>
+        <property key="ns1:Resolution" xsi:type="doubleType">
+          <value>4.00</value>
+        </property>
+        <property key="ns1:Scans" xsi:type="doubleType">
+          <value>32</value>
+        </property>
+        <property key="ns1:Humidity" xsi:type="doubleType">
+          <value>45</value>
+        </property>
+      </condition>
+      <result id="result_step_501" ref="restmpl_step_501">
+        <uuid>00000000-0000-4000-8000-000000000016</uuid>
+      </result>
+      <result id="result_step_502" ref="restmpl_step_502">
+        <uuid>00000000-0000-4000-8000-000000000017</uuid>
+        <insertion>
+          <uri>https://elab.example.org/app/download.php?f=abc123_spectrum.csv&amp;name=spectrum.csv</uri>
+          <hash method="SHA256">deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef</hash>
+        </insertion>
+        <property key="ns1:experimentBody" xsi:type="stringType">
+          <value>PMMA薄膜サンプルのFT-IRスペクトルを測定した。</value>
+        </property>
+        <property key="ns1:tags" xsi:type="stringType">
+          <value>FTIR,polymer</value>
+        </property>
+        <property key="ns1:AnalysisSummary" xsi:type="stringType">
+          <value>良好な吸収ピークを確認</value>
+        </property>
+        <property key="ns1:resultItem" xsi:type="stringType">
+          <value>分析結果まとめ</value>
+        </property>
+        <instanceRef id="iref_result_step_502" ref="result_step_501"/>
+      </result>
+    </results>
+  </data>
+  <eventLog id="eventLog_exp123">
+    <uuid>00000000-0000-4000-8000-000000000028</uuid>
+    <log id="log_exp123" ref="method_exp123">
+      <uuid>00000000-0000-4000-8000-000000000027</uuid>
+      <trace id="trace_exp123" ref="prog_exp123">
+        <uuid>00000000-0000-4000-8000-000000000026</uuid>
+        <event id="event_start_501" ref="instr_step_501">
+          <uuid>00000000-0000-4000-8000-000000000021</uuid>
+          <property key="concept:instance" xsi:type="uuidType">
+            <value>00000000-0000-4000-8000-000000000020</value>
+          </property>
+          <property key="lifecycle:transition" xsi:type="stringType">
+            <value>start</value>
+          </property>
+          <property key="time:timestamp" xsi:type="dateTimeType">
+            <value>2026-07-20T09:00:00+00:00</value>
+          </property>
+        </event>
+        <event id="event_complete_501" ref="instr_step_501">
+          <uuid>00000000-0000-4000-8000-000000000022</uuid>
+          <property key="concept:instance" xsi:type="uuidType">
+            <value>00000000-0000-4000-8000-000000000020</value>
+          </property>
+          <property key="lifecycle:transition" xsi:type="stringType">
+            <value>complete</value>
+          </property>
+          <property key="time:timestamp" xsi:type="dateTimeType">
+            <value>2026-07-20T09:20:00+00:00</value>
+          </property>
+        </event>
+        <event id="event_start_502" ref="instr_step_502">
+          <uuid>00000000-0000-4000-8000-000000000024</uuid>
+          <property key="concept:instance" xsi:type="uuidType">
+            <value>00000000-0000-4000-8000-000000000023</value>
+          </property>
+          <property key="lifecycle:transition" xsi:type="stringType">
+            <value>start</value>
+          </property>
+          <property key="time:timestamp" xsi:type="dateTimeType">
+            <value>2026-07-20T09:00:00+00:00</value>
+          </property>
+        </event>
+        <event id="event_complete_502" ref="instr_step_502">
+          <uuid>00000000-0000-4000-8000-000000000025</uuid>
+          <property key="concept:instance" xsi:type="uuidType">
+            <value>00000000-0000-4000-8000-000000000023</value>
+          </property>
+          <property key="lifecycle:transition" xsi:type="stringType">
+            <value>complete</value>
+          </property>
+          <property key="time:timestamp" xsi:type="dateTimeType">
+            <value>2026-07-20T09:45:00+00:00</value>
+          </property>
+          <resultsRef id="resref_502" ref="results_exp123"/>
+        </event>
+      </trace>
+    </log>
+  </eventLog>
+</maiml>

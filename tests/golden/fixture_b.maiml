@@ -1,0 +1,109 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<maiml xmlns="http://www.maiml.org/schemas" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:ns1="https://example.org/maiml/mylab" xmlns:concept="http://www.xes-standard.org/concept.xesext#" xmlns:lifecycle="http://www.xes-standard.org/lifecycle.xesext#" xmlns:time="http://www.xes-standard.org/time.xesext#" version="1.0" features="nested-attributes" xsi:type="maimlRootType">
+  <document id="document_exp200">
+    <uuid>00000000-0000-4000-8000-000000000001</uuid>
+    <description>汎用天秤による秤量</description>
+    <creator id="creator_instrument">
+      <uuid>679807da-1791-56a1-88ab-977919ec8727</uuid>
+      <description>ns1:elabftw-to-maiml</description>
+      <vendorRef id="vref_creator" ref="vendor_of_creator"/>
+    </creator>
+    <vendor id="vendor_of_creator">
+      <uuid>0b49f70c-35d6-5c4f-b15d-b62495e6d457</uuid>
+      <description>ns1:Deltablot</description>
+    </vendor>
+    <owner id="owner_experiment">
+      <uuid>bef1d6ee-5ed1-5f4f-a5c8-066c6defee9a</uuid>
+      <description>Suzuki Hanako</description>
+    </owner>
+    <date>2026-08-01T10:00:00+00:00</date>
+  </document>
+  <protocol id="protocol_exp200">
+    <uuid>00000000-0000-4000-8000-000000000009</uuid>
+    <method id="method_exp200">
+      <uuid>00000000-0000-4000-8000-000000000008</uuid>
+      <description>汎用天秤による秤量</description>
+      <pnml id="pnml_exp200">
+        <uuid>00000000-0000-4000-8000-000000000003</uuid>
+        <place id="p_material_in"/>
+        <place id="p_condition_in"/>
+        <place id="p_result_out"/>
+        <transition id="t_step_701"/>
+        <arc id="a1" source="p_material_in" target="t_step_701"/>
+        <arc id="a2" source="p_condition_in" target="t_step_701"/>
+        <arc id="a3" source="t_step_701" target="p_result_out"/>
+      </pnml>
+      <program id="prog_exp200">
+        <uuid>00000000-0000-4000-8000-000000000007</uuid>
+        <instruction id="instr_step_701">
+          <uuid>00000000-0000-4000-8000-000000000002</uuid>
+          <description>秤量</description>
+          <transitionRef id="tref_t_step_701" ref="t_step_701"/>
+        </instruction>
+        <materialTemplate id="mattmpl_0">
+          <uuid>00000000-0000-4000-8000-000000000004</uuid>
+          <description>(no linked item)</description>
+          <placeRef id="pref_mat_0" ref="p_material_in"/>
+        </materialTemplate>
+        <conditionTemplate id="condtmpl_exp200">
+          <uuid>00000000-0000-4000-8000-000000000005</uuid>
+          <placeRef id="pref_cond" ref="p_condition_in"/>
+        </conditionTemplate>
+        <resultTemplate id="restmpl_step_701">
+          <uuid>00000000-0000-4000-8000-000000000006</uuid>
+          <placeRef id="pref_res_701" ref="p_result_out"/>
+        </resultTemplate>
+      </program>
+    </method>
+  </protocol>
+  <data id="data_exp200">
+    <uuid>00000000-0000-4000-8000-000000000014</uuid>
+    <results id="results_exp200">
+      <uuid>00000000-0000-4000-8000-000000000013</uuid>
+      <material id="material_0" ref="mattmpl_0">
+        <uuid>00000000-0000-4000-8000-000000000010</uuid>
+        <description>(no linked item)</description>
+      </material>
+      <condition id="condition_exp200" ref="condtmpl_exp200">
+        <uuid>00000000-0000-4000-8000-000000000011</uuid>
+      </condition>
+      <result id="result_step_701" ref="restmpl_step_701">
+        <uuid>00000000-0000-4000-8000-000000000012</uuid>
+      </result>
+    </results>
+  </data>
+  <eventLog id="eventLog_exp200">
+    <uuid>00000000-0000-4000-8000-000000000020</uuid>
+    <log id="log_exp200" ref="method_exp200">
+      <uuid>00000000-0000-4000-8000-000000000019</uuid>
+      <trace id="trace_exp200" ref="prog_exp200">
+        <uuid>00000000-0000-4000-8000-000000000018</uuid>
+        <event id="event_start_701" ref="instr_step_701">
+          <uuid>00000000-0000-4000-8000-000000000016</uuid>
+          <property key="concept:instance" xsi:type="uuidType">
+            <value>00000000-0000-4000-8000-000000000015</value>
+          </property>
+          <property key="lifecycle:transition" xsi:type="stringType">
+            <value>start</value>
+          </property>
+          <property key="time:timestamp" xsi:type="dateTimeType">
+            <value>2026-08-01T10:00:00+00:00</value>
+          </property>
+        </event>
+        <event id="event_complete_701" ref="instr_step_701">
+          <uuid>00000000-0000-4000-8000-000000000017</uuid>
+          <property key="concept:instance" xsi:type="uuidType">
+            <value>00000000-0000-4000-8000-000000000015</value>
+          </property>
+          <property key="lifecycle:transition" xsi:type="stringType">
+            <value>complete</value>
+          </property>
+          <property key="time:timestamp" xsi:type="dateTimeType">
+            <value>2026-08-01T10:05:00+00:00</value>
+          </property>
+          <resultsRef id="resref_701" ref="results_exp200"/>
+        </event>
+      </trace>
+    </log>
+  </eventLog>
+</maiml>

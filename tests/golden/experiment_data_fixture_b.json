@@ -1,0 +1,29 @@
+{
+  "elab_id": 200,
+  "title": "汎用天秤による秤量",
+  "date": "2026-08-01T10:00:00",
+  "body_text": null,
+  "owner": {
+    "key": "elabftw-user-7@https://elab.example.org",
+    "name": "Suzuki Hanako",
+    "description": null
+  },
+  "creator": null,
+  "vendor": null,
+  "instruments": [],
+  "steps": [
+    {
+      "elab_id": 701,
+      "title": "秤量",
+      "body": "秤量",
+      "started_at": null,
+      "finished_at": "2026-08-01T10:05:00",
+      "is_finished": true
+    }
+  ],
+  "materials": [],
+  "condition_properties": [],
+  "result_properties": [],
+  "uploads": [],
+  "elab_url": "https://elab.example.org/experiments.php?mode=view&id=200"
+}
