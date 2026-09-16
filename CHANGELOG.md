@@ -2,10 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
-## [Unreleased]
+## [0.3.0] - 2026-09-16
 
-`elabftw2MaiML_phase5_design.md` の Phase 5-1 (汎用接続基盤)・Phase 5-2
-(設定可能なフィールドマッピング)・Phase 5-3 (MaiMLへの反映) に対応する。
+実変換パイプラインへの統合: `elabftw2MaiML_phase5_design.md` の Phase 5-1
+(汎用接続基盤)・Phase 5-2 (設定可能なフィールドマッピング)・Phase 5-3
+(MaiMLへの反映)・Phase 5-4 (実データによる検証、対応表の実際のCustom Field名
+への調整) に対応するリリースです。`--field-mapping`を指定した場合に限り、
+構造化フィールド (Custom Field) と自由記述 (実験本文・Step本文) を統合し、
+食い違いの無い値だけを自動的にMaiML出力へ反映できるようになりました。
+`--field-mapping`を指定しない (これまでどおりの) 使い方には一切影響しません。
 
 ### Added
 
@@ -168,6 +173,14 @@ All notable changes to this project are documented in this file.
   自由記述と一致/不一致の両ケースが正しく扱われること、生成MaiMLが整形式
   であることを確認する。公式XSDによる検証も別途実施し、MUSTレベルのエラーが
   無いことを確認済み。
+
+### Changed
+
+- Bumped internal `CREATOR_SOFTWARE_VERSION` (`elabftw2maiml/builder.py`) to
+  `0.3.0`。この値は「変換ソフトウェア」エンティティの名前ベースUUID (v5) の
+  元になっているため、バージョンを上げるとMaiML出力中の該当UUIDが変わる
+  (`tests/golden/fixture_b.maiml`をリリースに合わせて再生成し、他の内容が
+  変化していないことを確認済み)。
 
 ### Notes
 
