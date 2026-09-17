@@ -16,7 +16,7 @@ from datetime import datetime
 
 from elabftw2maiml.model import ExperimentData, LinkedItem, PropertyValue
 from elabftw2maiml.interpretation.conflict import InterpretationCandidate, Conflict
-from elabftw2maiml.interpretation.pipeline import InterpretationReport
+from elabftw2maiml.interpretation.pipeline import InterpretationReport, step_context
 from elabftw2maiml.interpretation.apply import apply_interpretation_report
 
 
@@ -113,6 +113,66 @@ class TestConditionAndResultProperties:
         apply_interpretation_report(exp, report, ns_prefix="mylab")
 
         assert exp.condition_properties[0].key == "mylab:accelerating_voltage"
+
+
+class TestMultipleStepsWithSameSemanticType:
+    """コードレビュー (2026-09-17) 4.1の指摘対応: 異なるStep由来の同じ
+    semantic_typeの値が、後勝ち上書きでもスキップでもなく、両方
+    ExperimentDataへ保持されること。"""
+
+    def test_different_step_contexts_are_both_reflected(self):
+        exp = _make_experiment()
+        candidate_step1 = _accepted_candidate(
+            semantic_type="temperature", value=40, unit="degC",
+            context=step_context(1),
+        )
+        candidate_step2 = _accepted_candidate(
+            semantic_type="temperature", value=80, unit="degC",
+            context=step_context(2),
+        )
+        report = InterpretationReport(accepted=[candidate_step1, candidate_step2])
+
+        logs = apply_interpretation_report(exp, report)
+
+        assert len(exp.condition_properties) == 2
+        by_key = {p.key: p for p in exp.condition_properties}
+        assert by_key["ns1:temperature__step_1"].value == 40
+        assert by_key["ns1:temperature__step_2"].value == 80
+        # どちらも「スキップ」ではなく「反映」ログになっていること。
+        assert sum("反映" in line for line in logs) == 2
+        assert not any("スキップ" in line for line in logs)
+
+    def test_experiment_context_key_format_is_unchanged(self):
+        """既定の実験全体context (`EXPERIMENT_CONTEXT`) では、従来通り
+        semantic_typeのみのkeyになる (後方互換性の維持)。"""
+        exp = _make_experiment()
+        candidate = _accepted_candidate(context="experiment")
+        report = InterpretationReport(accepted=[candidate])
+
+        apply_interpretation_report(exp, report)
+
+        assert exp.condition_properties[0].key == "ns1:accelerating_voltage"
+
+    def test_same_step_context_still_dedupes(self):
+        """同じStep (同じcontext) の同じsemantic_typeが2回反映されようとした
+        場合は、これまで通り重複としてスキップされる (Step単位の一意性は
+        壊さない)。"""
+        exp = _make_experiment()
+        candidate_a = _accepted_candidate(
+            semantic_type="temperature", value=40, unit="degC",
+            context=step_context(1),
+        )
+        candidate_b = _accepted_candidate(
+            semantic_type="temperature", value=41, unit="degC",
+            context=step_context(1),
+        )
+        report = InterpretationReport(accepted=[candidate_a, candidate_b])
+
+        logs = apply_interpretation_report(exp, report)
+
+        assert len(exp.condition_properties) == 1
+        assert exp.condition_properties[0].value == 40
+        assert any("スキップ" in line for line in logs)
 
 
 class TestMaterialsTarget:

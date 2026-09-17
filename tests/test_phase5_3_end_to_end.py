@@ -31,10 +31,13 @@ from elabftw2maiml.interpretation import (
     RawField,
     FieldMapping,
     build_structured_candidates,
+    candidate_from_field,
     InterpretationPipeline,
+    InterpretationReport,
     apply_interpretation_report,
     format_interpretation_report,
     SemTemTextRuleInterpreter,
+    step_context,
 )
 
 SCHEMA_PATH = Path(__file__).parent.parent / "schemas" / "maiml.xsd"
@@ -300,3 +303,56 @@ class TestRealisticStringValuesWithEmbeddedUnits:
 
         text = format_interpretation_report(report)
         assert "not measured" in text
+
+
+class TestMultipleStepsSameSemanticTypeEndToEnd:
+    """コードレビュー (2026-09-17) 4.1・8.1の指摘対応: 異なるStepの同じ
+    semantic_typeの構造化候補が、両方ExperimentDataへ反映され、生成された
+    MaiMLにも両方出力されることを確認する統合テスト。"""
+
+    STEP_FIELD_MAPPING = FieldMapping.from_dict({
+        "fields": {
+            "Temperature(degC)": {
+                "semantic_type": "temperature",
+                "role": "condition",
+                "unit": "degC",
+                "target": "condition_properties",
+            },
+        }
+    })
+
+    def test_step1_and_step2_temperature_both_reflected_and_built(self):
+        experiment = ExperimentData(
+            elab_id=50,
+            title="複数Step温度記録テスト",
+            date=datetime(2026, 9, 16),
+            body_text="",
+        )
+
+        step1_raw = RawField(name="Temperature(degC)", value="40 degC")
+        step2_raw = RawField(name="Temperature(degC)", value="80 degC")
+        candidate_step1 = candidate_from_field(
+            step1_raw, self.STEP_FIELD_MAPPING, context_override=step_context(1),
+        )
+        candidate_step2 = candidate_from_field(
+            step2_raw, self.STEP_FIELD_MAPPING, context_override=step_context(2),
+        )
+        assert candidate_step1 is not None and candidate_step2 is not None
+
+        # 2つのStep由来の候補は、そもそも異なるcontextのため競合しない
+        # (detect_conflicts()の(semantic_type, context)グルーピングにより無関係)。
+        report = InterpretationReport(accepted=[candidate_step1, candidate_step2])
+
+        apply_interpretation_report(experiment, report)
+
+        condition_keys = {p.key: p.value for p in experiment.condition_properties}
+        assert condition_keys == {
+            "ns1:temperature__step_1": Decimal("40"),
+            "ns1:temperature__step_2": Decimal("80"),
+        }
+
+        builder = MaimlBuilder()
+        xml_root = builder.build(experiment)
+        xml_bytes = etree.tostring(xml_root)
+        assert b"ns1:temperature__step_1" in xml_bytes
+        assert b"ns1:temperature__step_2" in xml_bytes

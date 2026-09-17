@@ -2,6 +2,64 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.1] - 2026-09-17
+
+v0.3.0のコードレビュー (`elabftw2MaiML_phase5_code_review.md`, 2026-09-17実施)
+で指摘された、重要度「高」の3件全てと「中」の4件全てへの対応リリースです。
+`--field-mapping`を指定しない (これまでどおりの) 使い方には引き続き一切
+影響しません。
+
+### Fixed
+
+- **(4.1)** 異なるStep由来 (`step:1`/`step:2`等) の同じ`semantic_type`の値が、
+  `apply_interpretation_report()` (`interpretation/apply.py`) 側で同一キーに
+  なり、後から反映しようとした2件目が「既存キー」として黙ってスキップされ
+  データが失われる問題を修正。実験全体を表す既定context (`experiment`) では
+  引き続き`semantic_type`のみのkey (既存出力・テストとの後方互換性を維持)、
+  それ以外のcontext (Step単位等) の場合のみcontextをkeyへ含めるようにした。
+- **(4.2)** `detect_conflicts()`/`group_candidates()` (`interpretation/
+  conflict.py`) が候補の`role`/`target`を考慮せず`semantic_type`と`context`
+  のみでグルーピングしていたため、役割が異なる値 (例: 材料としてのmass vs
+  結果としてのmass) まで誤って競合として検出され得た問題を修正。`role`/
+  `target`が確定している候補同士は値が異なっても別グループとして扱い、
+  未確定 (`None`) の候補はワイルドカードとして確定側のグループとも比較する
+  ルールを導入した (`Conflict`に`role`/`target`フィールドを追加)。
+- **(4.3)** `candidate_from_field()` (`interpretation/field_mapping.py`) で、
+  `raw.unit` (eLabFTW側の実際の入力単位) が対応表の`rule.unit` (期待単位) と
+  食い違う場合でも`raw.unit`が無条件に優先されており、次元の異なる値が
+  気づかれずに自動反映されてしまう可能性があった問題を修正。両方が指定
+  されていて次元 (`canonical_unit()`で正規化した単位) が異なる場合は、値を
+  見るまでもなく自動反映を拒否し、原値・理由を保持して`unclassified`へ回す
+  ようにした。
+
+### Added
+
+- **(5.1)** `find_missing_required_fields()`
+  (`interpretation/field_mapping.py`) を追加。対応表で`required: true`と
+  指定されているフィールドが、実際のCustom Field群に1件も存在しない場合に
+  検出できるようにした。`elabftw_to_maiml.py`の`--field-mapping`指定時に、
+  検出結果を警告として標準出力に表示する (変換自体は継続する)。
+- **(5.2)** `parse_numeric_with_unit()` (`interpretation/normalize.py`) が、
+  桁区切りカンマ (`"1,234"`)・先頭の`+`符号 (`"+200"`)・指数表記
+  (`"1.5e-3"`/`"2.5E+10"`) を数値として認識できるようにした。
+- **(5.4)** GitHub Actions ワークフロー (`.github/workflows/tests.yml`) を
+  追加。push/PR時にPython 3.9〜3.12で`tests/`の回帰テスト一式を自動実行する。
+  依存パッケージは`requirements-dev.txt`にまとめた。
+
+### Changed
+
+- **(5.3)** README.mdのバージョン表記を、実際のリリース番号 (v0.3.1) に
+  合わせて修正 (v0.3.0リリース後もv0.2.0のまま更新されていなかった)。
+- `CREATOR_SOFTWARE_VERSION` (`elabftw2maiml/builder.py`) を`0.3.1`に更新
+  (MaiML内の「変換ソフトウェア」エンティティのUUIDが変わるため、
+  `tests/golden/fixture_*.maiml`を`tests/generate_golden.py`で再生成した)。
+- `elabftw2maiml/interpretation/field_mappings/yasunaga_lab_stem.yaml` の
+  RESULTフィールドグループに、その分類方針 (eLabFTW側のCustom Field Group
+  構造にそのまま合わせる設計であり、内容が装置設定寄りに見えるフィールドも
+  意図的にresult_propertiesのままにしていること) を説明するコメントを追加
+  (**4.4**。分類・target自体の変更は無し。2026-09-17にユーザーへ確認の上、
+  現状維持を決定)。
+
 ## [0.3.0] - 2026-09-16
 
 実変換パイプラインへの統合: `elabftw2MaiML_phase5_design.md` の Phase 5-1

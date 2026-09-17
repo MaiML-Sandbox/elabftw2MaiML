@@ -1,0 +1,13 @@
+# テスト実行に必要な依存パッケージ (コードレビュー 2026-09-17 5.4対応:
+# GitHub Actions CIから `pip install -r requirements-dev.txt` で一括インストール
+# できるようにするためのファイル)。
+#
+# 実運用 (elabftw_to_maiml.py の実行) 自体には elabapi-python / lxml のみが
+# 必要 (README.md「セットアップ」節参照)。pyyaml は
+# `FieldMapping.from_yaml_file()` (interpretation/field_mapping.py) を使う
+# 場合のみ必要な任意依存だが、テストでは対応表YAMLの読み込みテストがあるため
+# 必須にしている。
+pytest>=7.0
+pyyaml>=6.0
+elabapi-python>=5.0
+lxml>=4.9

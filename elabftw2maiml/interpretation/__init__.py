@@ -32,6 +32,7 @@ from .field_mapping import (
     FieldMapping,
     candidate_from_field,
     build_structured_candidates,
+    find_missing_required_fields,
 )
 from .profiles import SemTemTextRuleInterpreter, SEM_TEM_PHASE1_SEMANTIC_TYPES
 from .apply import apply_interpretation_report
@@ -65,6 +66,7 @@ __all__ = [
     "FieldMapping",
     "candidate_from_field",
     "build_structured_candidates",
+    "find_missing_required_fields",
     "SemTemTextRuleInterpreter",
     "SEM_TEM_PHASE1_SEMANTIC_TYPES",
     "apply_interpretation_report",
