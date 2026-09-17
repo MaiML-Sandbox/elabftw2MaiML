@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- `elabftw2maiml/interpretation/field_mappings/yasunaga_lab_stem.yaml` の
+  RESULTフィールドグループのコメントを整理・簡潔化。v0.3.1での4.4対応
+  (「STEM対応表の意味分類 → 要確認」から「ユーザー分類を正として確定」への
+  判定更新) の趣旨はそのままに、次の2点を明記した:
+  (1) eLabFTW上でユーザーがRESULTグループに分類したフィールドは、各フィールド
+  の科学的意味に基づく自動再分類を行わず、その分類を正としてMaiMLの
+  `result_properties`へ反映する方針であること。
+  (2) eLabFTWのCustom Field Group名 (`RESULT`) とMaiMLの`role`
+  (`result`) は現在値として一致しているが概念上は別物であり、
+  `candidate_from_field()` (`interpretation/field_mapping.py`) はGroup名から
+  自動的にroleを導出しない。両者を対応付けているのは対応表 (YAML) 自身であり、
+  この設計により他の研究室は対応表を差し替えるだけで同じフィールドを
+  `condition_properties`側へ変更できる。
+  分類・target・semantic_type等の値自体は変更していない。
+
 ## [0.3.1] - 2026-09-17
 
 v0.3.0のコードレビュー (`elabftw2MaiML_phase5_code_review.md`, 2026-09-17実施)
