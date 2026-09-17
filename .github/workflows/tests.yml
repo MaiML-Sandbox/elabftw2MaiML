@@ -9,6 +9,11 @@ name: tests
 # 合成フィクスチャのみを使う回帰テスト)。schemas/maiml.xsd が無い環境では
 # XSD検証テストが自動的にスキップされる (tests/test_regression_maiml_build.py
 # 側の既存の仕組みによる)。
+#
+# 修正 (2026-09-17): actions/setup-pythonの`cache: pip`は、既定では
+# requirements.txt/pyproject.toml等を探すため、`requirements-dev.txt`しか
+# 無いこのリポジトリでは依存関係ファイルを見つけられずジョブが失敗していた。
+# `cache-dependency-path`で明示的に指定する。
 
 on:
   push:
@@ -34,6 +39,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
+          cache-dependency-path: requirements-dev.txt
 
       - name: Install dependencies
         run: |
