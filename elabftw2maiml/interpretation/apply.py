@@ -50,7 +50,7 @@ from typing import List, Optional
 
 from ..model import ExperimentData, LinkedItem, Party, PropertyValue
 from .conflict import InterpretationCandidate
-from .pipeline import InterpretationReport
+from .pipeline import EXPERIMENT_CONTEXT, InterpretationReport
 
 # 実験自身のMATERIALグループの自己フィールドを合成LinkedItemにまとめる際、
 # elabftw_client.py の fetch_experiment() が使っている規約 (elab_id=0) に合わせる。
@@ -89,7 +89,23 @@ def _infer_xsi_type(value) -> str:
 
 
 def _candidate_key(candidate: InterpretationCandidate, ns_prefix: str) -> str:
-    return f"{ns_prefix}:{_sanitize_ncname(candidate.semantic_type)}"
+    """`InterpretationCandidate` を `ExperimentData`/MaiML上の一意なproperty keyに
+    変換する。
+
+    コードレビュー (2026-09-17) 4.1の指摘対応: 以前はsemantic_typeのみでkeyを
+    生成しており、異なるcontext (例: `step:1`と`step:2`) の同じsemantic_typeが
+    同じkeyになって、2件目が「既存キー」として黙ってスキップされる問題があった
+    (複数StepでStepごとに同じ意味種別の値を記録するケースでデータが欠落する)。
+
+    実験全体を表す既定のcontext (`EXPERIMENT_CONTEXT`。多くの対応表がこれを
+    使っている) では、これまで通り`semantic_type`のみのkeyを維持し、既存の
+    MaiML出力・テストとの後方互換性を保つ。それ以外のcontext (Step単位の
+    `step:<id>`や、SEM/TEM対応表の`sem_acquisition`等) の場合のみ、contextを
+    keyへ含めて衝突を避ける。"""
+    base = _sanitize_ncname(candidate.semantic_type)
+    if candidate.context and candidate.context != EXPERIMENT_CONTEXT:
+        return f"{ns_prefix}:{base}__{_sanitize_ncname(candidate.context)}"
+    return f"{ns_prefix}:{base}"
 
 
 def _candidate_to_property(candidate: InterpretationCandidate, ns_prefix: str) -> PropertyValue:

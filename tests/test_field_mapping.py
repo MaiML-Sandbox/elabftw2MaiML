@@ -21,6 +21,7 @@ from elabftw2maiml.interpretation.field_mapping import (
     FieldMapping,
     candidate_from_field,
     build_structured_candidates,
+    find_missing_required_fields,
 )
 
 EXAMPLE_YAML_PATH = os.path.join(
@@ -154,11 +155,19 @@ class TestCandidateFromField:
         raw = RawField(name="未知フィールド", value=1)
         assert candidate_from_field(raw, mapping) is None
 
-    def test_raw_unit_overrides_rule_unit(self):
+    def test_raw_unit_conflicting_with_rule_unit_is_rejected(self):
+        """コードレビュー (2026-09-17) 4.3対応: 以前は`raw.unit`が無条件に
+        `rule.unit`より優先され、対応表の期待単位(kV)と食い違う単位(V)が
+        入力されていても気づかず採用してしまっていた。現在はrule.unitと
+        raw.unitの次元が食い違う場合、値を見るまでもなく自動反映を拒否し、
+        role/targetをNoneにして原値・理由を保持する。"""
         mapping = _simple_mapping()
         raw = RawField(name="加速電圧", value=15, unit="V")
         candidate = candidate_from_field(raw, mapping)
-        assert candidate.unit == "V"
+        assert candidate.role is None
+        assert candidate.target is None
+        assert candidate.raw_value == 15
+        assert candidate.reason is not None
 
     def test_missing_raw_unit_falls_back_to_rule_unit(self):
         mapping = _simple_mapping()
@@ -272,14 +281,75 @@ class TestCandidateFromFieldNormalization:
         assert candidate.reason is None
         assert candidate.role == "material"
 
-    def test_raw_unit_wins_over_rule_unit_as_expected_unit(self):
+    def test_raw_unit_conflicting_with_rule_unit_is_rejected_for_string_value(self):
+        """文字列値でも同様に、rule.unit("kV")とraw.unit("V")の次元が
+        食い違うため自動反映を拒否する (4.3対応)。"""
         mapping = _simple_mapping()
         raw = RawField(name="加速電圧", value="15", unit="V")
         candidate = candidate_from_field(raw, mapping)
+        assert candidate.role is None
+        assert candidate.target is None
+        assert candidate.raw_value == "15"
+        assert candidate.reason is not None
+
+    def test_raw_unit_matching_rule_unit_is_accepted(self):
+        """raw.unitがrule.unitと一致する(次元が同じ)場合は、従来通り
+        正規化して自動反映の対象になる。"""
+        mapping = _simple_mapping()
+        raw = RawField(name="加速電圧", value="15", unit="kV")
+        candidate = candidate_from_field(raw, mapping)
         assert candidate.value == Decimal("15")
-        assert candidate.unit == "V"
-        # rule.unitは"kV"だが、raw.unitが優先されるため次元不一致にはならない。
+        assert candidate.unit == "kV"
         assert candidate.role == "condition"
+
+    def test_rule_unit_used_when_raw_unit_absent(self):
+        """raw.unitが指定されていない場合は、従来通りrule.unitを
+        expected_unitとして採用する。"""
+        mapping = _simple_mapping()
+        raw = RawField(name="加速電圧", value=15)
+        candidate = candidate_from_field(raw, mapping)
+        assert candidate.unit == "kV"
+        assert candidate.role == "condition"
+
+    def test_review_8_3_rule_kv_raw_ma_is_unclassified(self):
+        """コードレビュー8.3: rule.unit=kV, raw.unit=mA, value=200の場合、
+        自動反映せずunclassified相当(role/target=None)になり、raw_value/reason
+        が保持されること。"""
+        mapping = _simple_mapping()
+        raw = RawField(name="加速電圧", value=200, unit="mA")
+        candidate = candidate_from_field(raw, mapping)
+        assert candidate.role is None
+        assert candidate.target is None
+        assert candidate.raw_value == 200
+        assert candidate.reason is not None
+
+    def test_review_8_4_embedded_unit_inconsistent_with_raw_unit(self):
+        """コードレビュー8.4: 値文字列に埋め込まれた単位("200 kV")が、
+        raw.unit("V")と食い違う場合も、正規化できない値として検出される。
+        ここではrule.unit=kV, raw.unit=V (rule/raw自体は既存の次元不一致
+        チェックで拒否される) ケースに加え、rule.unitとraw.unitが一致していても
+        値文字列側の埋め込み単位が食い違う場合の検出も確認する。"""
+        mapping = _simple_mapping()
+        # rule.unit(kV) と raw.unit(V) 自体が食い違うため、値を見るまでもなく拒否。
+        raw = RawField(name="加速電圧", value="200 kV", unit="V")
+        candidate = candidate_from_field(raw, mapping)
+        assert candidate.role is None
+        assert candidate.target is None
+        assert candidate.raw_value == "200 kV"
+        assert candidate.reason is not None
+
+    def test_embedded_unit_inconsistent_with_matching_raw_unit(self):
+        """rule.unitとraw.unitが一致していても (次元不一致チェックを通過しても)、
+        値文字列に埋め込まれた単位がexpected_unitと食い違えば、
+        `parse_numeric_with_unit()`側のチェックで正規化できない値として
+        検出される。"""
+        mapping = _simple_mapping()
+        raw = RawField(name="加速電圧", value="200 mA", unit="kV")
+        candidate = candidate_from_field(raw, mapping)
+        assert candidate.role is None
+        assert candidate.target is None
+        assert candidate.raw_value == "200 mA"
+        assert candidate.reason is not None
 
 
 class TestBuildStructuredCandidates:
@@ -353,3 +423,63 @@ class TestBuildStructuredCandidates:
         )
         assert candidates[0].source == "field_group"
         assert candidates[0].confidence == 0.9
+
+
+class TestFindMissingRequiredFields:
+    """コードレビュー (2026-09-17) 5.1対応: `required: true` の対応表エントリの
+    うち、実際のフィールド群に存在しないものを検出する。"""
+
+    def test_no_missing_when_all_required_fields_present(self):
+        mapping = _simple_mapping()
+        fields = [
+            RawField(name="加速電圧", value=15, unit="kV"),
+            RawField(name="試料ID", value="S-001"),
+        ]
+        assert find_missing_required_fields(fields, mapping) == []
+
+    def test_reports_missing_required_field_by_primary_name(self):
+        """`_simple_mapping()`では「加速電圧」がrequired=True。渡された
+        フィールドに含まれていなければ検出される (「試料ID」はrequiredでは
+        ないので対象外)。"""
+        mapping = _simple_mapping()
+        fields = [RawField(name="試料ID", value="S-001")]
+        missing = find_missing_required_fields(fields, mapping)
+        assert missing == ["加速電圧"]
+
+    def test_alias_presence_counts_as_present(self):
+        """主キー名では無くaliasで入力されていても、必須フィールドが
+        存在するとみなす。"""
+        mapping = _simple_mapping()
+        fields = [
+            RawField(name="HV", value=15, unit="kV"),
+            RawField(name="試料ID", value="S-001"),
+        ]
+        assert find_missing_required_fields(fields, mapping) == []
+
+    def test_non_required_missing_fields_are_not_reported(self):
+        mapping = _simple_mapping()
+        # 「試料ID」(required=False) を渡さなくても、その欠落は報告されない。
+        # 「加速電圧」(required=True) だけ渡す。
+        fields = [RawField(name="加速電圧", value=15, unit="kV")]
+        assert find_missing_required_fields(fields, mapping) == []
+
+    def test_empty_fields_reports_all_required(self):
+        mapping = _simple_mapping()
+        missing = find_missing_required_fields([], mapping)
+        assert missing == ["加速電圧"]
+
+    def test_yasunaga_lab_stem_yaml_required_fields(self):
+        """実際のラボ対応表 (yasunaga_lab_stem.yaml) には5件のrequiredフィールド
+        (sampleID/sampleName/ImagingMode/Magnification/AcceleratingVoltage(kV))
+        があり、何も渡さなければ全て検出される。"""
+        path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "elabftw2maiml", "interpretation", "field_mappings",
+            "yasunaga_lab_stem.yaml",
+        )
+        mapping = FieldMapping.from_yaml_file(path)
+        missing = find_missing_required_fields([], mapping)
+        assert set(missing) == {
+            "sampleID", "sampleName", "ImagingMode",
+            "Magnification", "AcceleratingVoltage(kV)",
+        }

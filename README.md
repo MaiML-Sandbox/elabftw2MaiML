@@ -1,6 +1,6 @@
 # elabftw2maiml
 
-**バージョン: v0.2.0** (変更履歴は [CHANGELOG.md](./CHANGELOG.md) を参照)
+**バージョン: v0.3.1** (変更履歴は [CHANGELOG.md](./CHANGELOG.md) を参照)
 
 eLabFTW (REST API v2 / `elabapi-python`) の実験データを、JIS K 0200 (MaiML v1.0) 形式の
 `.maiml` ファイルに変換するツールです。

@@ -134,6 +134,7 @@ def main() -> int:
         from elabftw2maiml.interpretation import (
             FieldMapping,
             build_structured_candidates,
+            find_missing_required_fields,
             InterpretationPipeline,
             apply_interpretation_report,
             format_interpretation_report,
@@ -144,6 +145,7 @@ def main() -> int:
         raw_fields = client.fetch_raw_custom_fields(args.experiment_id)
         structured_candidates, unmapped_fields = build_structured_candidates(
             raw_fields, field_mapping, source="custom_field")
+        missing_required_fields = find_missing_required_fields(raw_fields, field_mapping)
 
         pipeline = InterpretationPipeline(
             extra_text_interpreters=[SemTemTextRuleInterpreter()],
@@ -162,6 +164,10 @@ def main() -> int:
             print("\n[対応表に定義が無いため無視されたフィールド]")
             for f in unmapped_fields:
                 print(f"  - {f.name} (group={f.group})")
+        if missing_required_fields:
+            print("\n[警告: 対応表でrequired: trueと指定されているが、実験に存在しないフィールド]")
+            for name in missing_required_fields:
+                print(f"  - {name}")
         print("--------------------------------------------------------------------------\n")
 
     builder = MaimlBuilder(ns_prefix=args.ns_prefix, ns_uri=args.ns_uri,

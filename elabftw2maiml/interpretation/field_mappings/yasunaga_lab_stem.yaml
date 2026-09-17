@@ -104,6 +104,32 @@ fields:
     target: condition_properties
 
   # --- RESULT --------------------------------------------------------------
+  # 設計意図の補足 (コードレビュー 2026-09-17 4.4対応。コメントのみ、
+  # 分類・target自体は変更していない):
+  #
+  # レビューでは、PixelSize/ImageWidth/ImageHeight/FieldofView(µm)/
+  # AcquisitionTime のように「値そのものは撮影条件 (どう撮ったか) に近く、
+  # 実験の結果・成果 (何が得られたか) とは言い切れないのでは」という指摘が
+  # あった (例: PixelSizeは装置設定次第で決まる値であり、CameraLength等の
+  # CONDITION側フィールドと本質的には近い性質を持つ、という見方)。
+  #
+  # この対応表では、role/targetを「measurement science上の条件/結果」という
+  # 厳密な区分ではなく、実際にYasunagaLabのeLabFTWテンプレート上でその
+  # フィールドがどのCustom Field Group (MATERIAL/CONDITION/RESULT) に
+  # 属しているかにそのまま合わせる、という方針を採用している。RESULT
+  # グループに属するフィールドは、たとえ内容が装置設定寄りに見えても
+  # role: result / target: result_properties のままにする。
+  #
+  # 2026-09-17にユーザーへ確認した結果、現状の分類 (全てresult_properties)
+  # を維持する方針で確定した。理由: (1) eLabFTW側のテンプレート構造
+  # (どのGroupに入力するか) と、生成されるMaiML上の分類を一致させておく
+  # ほうが、実験者にとって「入力した場所」と「出力先」の対応が分かりやすい。
+  # (2) STEM観察において「条件」と「結果」の境界は実際には連続的・
+  # 文脈依存であり、対応表側で独自の科学的判断を持ち込むと、ラボの実際の
+  # 運用 (テンプレートのGroup分け) とMaiML出力がかえって乖離しかねない。
+  # 将来、ドメイン的な理由で再分類したくなった場合は、このコメントを
+  # 参照した上で対象フィールドのroleとtargetのみを変更すればよい
+  # (semantic_type等は変更不要)。
   Detector:
     role: result
     semantic_type: detector_name

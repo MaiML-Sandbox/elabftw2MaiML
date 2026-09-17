@@ -126,3 +126,56 @@ class TestParseNumericWithUnitEdgeCases:
 
     def test_empty_string_cannot_be_parsed(self):
         assert parse_numeric_with_unit("", expected_unit="kV") is None
+
+
+class TestNumericFormatSupport:
+    """コードレビュー (2026-09-17) 5.2対応: 桁区切りカンマ・先頭`+`符号・
+    指数表記の数値をparse_numeric_with_unit()が正しく解釈できること。"""
+
+    def test_leading_plus_sign(self):
+        result = parse_numeric_with_unit("+200", expected_unit="kV")
+        assert result == NormalizedValue(value=Decimal("200"), unit="kV", raw_value="+200")
+
+    def test_leading_plus_sign_with_embedded_unit(self):
+        result = parse_numeric_with_unit("+200 kV", expected_unit="kV")
+        assert result.value == Decimal("200")
+        assert result.unit == "kV"
+
+    def test_comma_thousands_separator(self):
+        result = parse_numeric_with_unit("1,234", expected_unit=None)
+        assert result == NormalizedValue(value=Decimal("1234"), unit=None, raw_value="1,234")
+
+    def test_comma_thousands_separator_with_decimal(self):
+        result = parse_numeric_with_unit("12,345.6", expected_unit=None)
+        assert result.value == Decimal("12345.6")
+
+    def test_comma_thousands_separator_with_unit(self):
+        result = parse_numeric_with_unit("1,234 nm", expected_unit="nm")
+        assert result.value == Decimal("1234")
+        assert result.unit == "nm"
+
+    def test_multiple_comma_groups(self):
+        result = parse_numeric_with_unit("1,234,567", expected_unit=None)
+        assert result.value == Decimal("1234567")
+
+    def test_invalid_comma_grouping_is_not_normalized(self):
+        """3桁ごとの区切りになっていない不正なカンマ位置は数値として認識しない。"""
+        assert parse_numeric_with_unit("1,23", expected_unit=None) is None
+
+    def test_exponent_notation_lowercase_e(self):
+        result = parse_numeric_with_unit("1.5e-3", expected_unit=None)
+        assert result.value == Decimal("1.5e-3")
+
+    def test_exponent_notation_uppercase_e_with_plus(self):
+        result = parse_numeric_with_unit("2.5E+10", expected_unit=None)
+        assert result.value == Decimal("2.5E+10")
+
+    def test_exponent_notation_with_unit(self):
+        result = parse_numeric_with_unit("2e3 kV", expected_unit="kV")
+        assert result.value == Decimal("2e3")
+        assert result.unit == "kV"
+
+    def test_exponent_and_comma_do_not_break_dimension_mismatch_check(self):
+        """新しい数値表記でも、次元不一致の検出 (単位換算はしない方針) は
+        従来通り機能する。"""
+        assert parse_numeric_with_unit("1,234 mA", expected_unit="kV") is None

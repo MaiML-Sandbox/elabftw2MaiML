@@ -1,0 +1,44 @@
+name: tests
+
+# コードレビュー (2026-09-17) 5.4対応: これまでCIが無く、テストはローカルで
+# `python -m pytest tests/` を手動実行するしかなかった。push/PR時に自動で
+# 回帰テスト一式 (tests/) を実行し、複数のPythonバージョンで壊れていないことを
+# 継続的に確認できるようにする。
+#
+# 実際のeLabFTWサーバーへの接続は行わない (tests/はREADME.mdに記載の通り、
+# 合成フィクスチャのみを使う回帰テスト)。schemas/maiml.xsd が無い環境では
+# XSD検証テストが自動的にスキップされる (tests/test_regression_maiml_build.py
+# 側の既存の仕組みによる)。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run test suite
+        run: python -m pytest tests/ -v

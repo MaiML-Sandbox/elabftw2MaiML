@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 from .conflict import InterpretationCandidate
-from .normalize import parse_numeric_with_unit
+from .normalize import canonical_unit, parse_numeric_with_unit
 
 Number = Union[int, float, str]
 
@@ -143,6 +143,26 @@ class FieldMapping:
     def __len__(self) -> int:
         return len(self._by_name)
 
+    def all_names_for(self, rule: FieldRule) -> List[str]:
+        """指定した `rule` に登録されている全ての名前 (主キー名+alias) を返す
+        (コードレビュー 2026-09-17 5.1対応の補助メソッド)。"""
+        return [name for name, r in self._by_name.items() if r is rule]
+
+    def required_rules(self) -> Dict[str, FieldRule]:
+        """`required: true` が設定されている各 `FieldRule` を、それぞれの
+        登録名のうち最初に見つかったもの (`_register()`は主キー名を先に
+        登録するため、通常はYAML上の主キー名になる) をキーとして返す
+        (コードレビュー 2026-09-17 5.1対応)。同じruleが複数の名前
+        (主キー+alias) で登録されていても、1回だけ数える。"""
+        seen_ids = set()
+        result: Dict[str, FieldRule] = {}
+        for name, rule in self._by_name.items():
+            if not rule.required or id(rule) in seen_ids:
+                continue
+            seen_ids.add(id(rule))
+            result[name] = rule
+        return result
+
 
 def candidate_from_field(
     raw: RawField,
@@ -172,8 +192,18 @@ def candidate_from_field(
     正規化せずに渡すと自由記述側 (数値+別属性の単位) と型・表現が食い違い、
     実際には一致している値が誤って競合と判定されてしまう。
 
-    正規化できなかった場合 (数値として解釈できない、または対応表の期待単位と
-    次元が異なる。例: `"not measured"`や期待`kV`に対する`"200 mA"`) は、
+    対応表 (`rule.unit`) と `raw.unit` の両方が指定されていて、次元
+    (`interpretation.normalize.canonical_unit()`で正規化した単位) が異なる
+    場合は、値の文字列を見るまでもなく自動反映を拒否する (コードレビュー
+    2026-09-17 4.3対応)。以前は `raw.unit` が無条件に `rule.unit` より優先
+    されており、対応表の期待単位と食い違う単位が入力されていても、その
+    食い違いに気づかず `raw.unit` 側をそのまま採用して自動反映してしまう
+    (例: 対応表がkVを期待しているのに、誤って"200 mA"のようにmA付きで
+    記録された値をkVとして扱ってしまう) 問題があったため。
+
+    正規化できなかった場合 (数値として解釈できない、または値の文字列に
+    埋め込まれた単位が期待単位と次元が異なる。例: `"not measured"`や
+    期待`kV`に対する値文字列`"200 mA"`) も同様に、
     値をそのまま (`raw_value`として) 保持しつつ、`role`/`target`を`None`に
     強制する (自動反映させず、`interpretation.pipeline`の仕分けで
     `unclassified`に回すため。黙って捨てず、原値と理由を`reason`に残す)。
@@ -182,36 +212,62 @@ def candidate_from_field(
     if rule is None:
         return None
 
-    expected_unit = raw.unit if raw.unit is not None else rule.unit
     role = role_override if role_override is not None else rule.role
     target = rule.target
     reason = None
     value = raw.value
-    unit = expected_unit
     raw_value = None
 
-    # 単位が無いフィールドでも、対応表が data_type: number を明示している場合は
-    # 正規化を行う (例: DwellTime="10"、PixelSize="0.025" のように、単位不明のまま
-    # 数値として記録されているフィールド)。`parse_numeric_with_unit()` は
-    # expected_unit=None でも単位の食い違いチェックをスキップして数値のみを
-    # 解析できるため、そのまま呼び出せる。単位も data_type も無いフィールド
-    # (文字列フィールドの大半) は、従来通り正規化をスキップする (レガシー挙動)。
-    should_normalize = expected_unit is not None or rule.data_type == "number"
+    # コードレビュー (2026-09-17) 4.3対応: 以前は `raw.unit` (eLabFTW側の実際の
+    # 入力単位) が無条件に `rule.unit` (対応表が期待する単位) より優先されており、
+    # 対応表の期待と食い違う単位が指定された場合でも、その食い違いに気づかず
+    # `raw.unit` をそのまま採用して自動反映されてしまっていた
+    # (例: 対応表がAcceleratingVoltageの単位を"kV"と定義しているのに、
+    # 誤って"mA"付きで値200が記録されていても、"200 mA"を"200 kV"相当として
+    # 静かに反映してしまう)。
+    #
+    # 両方が指定されていて次元が異なる場合は、値の中身を見るまでもなく
+    # 自動反映を拒否し、原値と理由を残して`unclassified`に回す。
+    if (
+        rule.unit is not None
+        and raw.unit is not None
+        and canonical_unit(rule.unit) != canonical_unit(raw.unit)
+    ):
+        role = None
+        target = None
+        raw_value = raw.value
+        unit = None
+        value = raw.value
+        reason = (
+            f"raw.unit={raw.unit!r}が対応表のunit={rule.unit!r}と一致しないため、"
+            f"自動反映を無効化しました (raw_value={raw.value!r})"
+        )
+    else:
+        expected_unit = rule.unit if rule.unit is not None else raw.unit
+        unit = expected_unit
 
-    if should_normalize:
-        normalized = parse_numeric_with_unit(raw.value, expected_unit=expected_unit)
-        if normalized is not None:
-            value = normalized.value
-            unit = normalized.unit
-            raw_value = normalized.raw_value
-        else:
-            role = None
-            target = None
-            raw_value = raw.value
-            reason = (
-                f"値を正規化できないため自動反映を無効化しました "
-                f"(raw_value={raw.value!r}, expected_unit={expected_unit!r})"
-            )
+        # 単位が無いフィールドでも、対応表が data_type: number を明示している場合は
+        # 正規化を行う (例: DwellTime="10"、PixelSize="0.025" のように、単位不明の
+        # まま数値として記録されているフィールド)。`parse_numeric_with_unit()` は
+        # expected_unit=None でも単位の食い違いチェックをスキップして数値のみを
+        # 解析できるため、そのまま呼び出せる。単位も data_type も無いフィールド
+        # (文字列フィールドの大半) は、従来通り正規化をスキップする (レガシー挙動)。
+        should_normalize = expected_unit is not None or rule.data_type == "number"
+
+        if should_normalize:
+            normalized = parse_numeric_with_unit(raw.value, expected_unit=expected_unit)
+            if normalized is not None:
+                value = normalized.value
+                unit = normalized.unit
+                raw_value = normalized.raw_value
+            else:
+                role = None
+                target = None
+                raw_value = raw.value
+                reason = (
+                    f"値を正規化できないため自動反映を無効化しました "
+                    f"(raw_value={raw.value!r}, expected_unit={expected_unit!r})"
+                )
 
     return InterpretationCandidate(
         semantic_type=rule.semantic_type,
@@ -264,3 +320,34 @@ def build_structured_candidates(
             candidates.append(candidate)
 
     return candidates, unmapped
+
+
+def find_missing_required_fields(
+    fields: Sequence[RawField], field_mapping: FieldMapping
+) -> List[str]:
+    """対応表 (`field_mapping`) で `required: true` に指定されているフィールド
+    のうち、実際に渡された `fields` (eLabFTWから取得した生のCustom Field群) に
+    1件も存在しないものの名前一覧を返す (コードレビュー 2026-09-17 5.1対応)。
+
+    これまで `FieldRule.required` は対応表のスキーマ上定義されているだけで、
+    実際に「必須フィールドが欠落している」ことを検証する処理が無く、値を
+    入力し忘れても何の警告も出ないまま変換が完了してしまっていた。
+
+    存在確認は主キー名だけでなくaliasでも行う (`FieldMapping.lookup()`と同じ
+    正規化規則: 前後の空白を除去して比較する)。値が空文字列や `None` であっても
+    「フィールド自体は存在する」とみなす (値の妥当性検証は別の関心事であり、
+    ここでは「eLabFTW側にそのフィールドが入力欄として存在し、何らかの値が
+    記録されているか」だけを見る)。
+
+    戻り値は空リストなら「必須フィールドの欠落なし」。呼び出し側
+    (`elabftw_to_maiml.py`) は、これを致命的エラーにはせず、レポートとして
+    表示することを想定している (必須フィールドが無くても他のフィールドの
+    変換自体は継続できるため)。
+    """
+    present_names = {f.name.strip() for f in fields}
+    missing: List[str] = []
+    for name, rule in field_mapping.required_rules().items():
+        rule_names = set(field_mapping.all_names_for(rule))
+        if not (rule_names & present_names):
+            missing.append(name)
+    return missing
