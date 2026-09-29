@@ -5,7 +5,8 @@ sys.path.insert(0, ".")
 
 from lxml import etree
 from elabftw2maiml import (
-    MaimlBuilder, ExperimentData, Party, PropertyValue, LinkedItem, Step, FileRef,
+    MaimlBuilder, ExperimentData, Party, PropertyValue,
+    MaterialData, ConditionData, ResultData, Step, FileRef,
 )
 
 exp = ExperimentData(
@@ -25,25 +26,32 @@ exp = ExperimentData(
              is_finished=True),
     ],
     materials=[
-        LinkedItem(elab_id=88, title="PMMAサンプル", category="Sample", properties=[
+        MaterialData(key="material:item:88", elab_id=88, title="PMMAサンプル", category="Sample", properties=[
             PropertyValue(key="ns1:SampleID", xsi_type="stringType", value="SA-001"),
             PropertyValue(key="ns1:Thickness", xsi_type="doubleType", value="0.125",
                            units="mm", format_string="0.000"),
         ]),
     ],
-    condition_properties=[
-        PropertyValue(key="ns1:Resolution", xsi_type="doubleType", value="4.00",
-                       format_string="0.00", units="cm-1"),
-        PropertyValue(key="ns1:Scans", xsi_type="intType", value="32"),
+    conditions=[
+        ConditionData(key="condition:experiment:123", properties=[
+            PropertyValue(key="ns1:Resolution", xsi_type="doubleType", value="4.00",
+                           format_string="0.00", units="cm-1"),
+            PropertyValue(key="ns1:Scans", xsi_type="intType", value="32"),
+        ]),
     ],
-    result_properties=[
-        PropertyValue(key="ns1:Note", xsi_type="stringType", value="良好なスペクトルが得られた"),
-    ],
-    uploads=[
-        FileRef(filename="spectrum.csv",
-                uri="https://elab.example.org/app/download.php?f=spectrum.csv",
-                hash_b64="q6L6q6L6q6L6q6L6q6L6q6L6q6L6q6L6q6L6q6L6q6I=",
-                hash_method="SHA-256"),
+    results=[
+        ResultData(
+            key="result:experiment:123",
+            properties=[
+                PropertyValue(key="ns1:Note", xsi_type="stringType", value="良好なスペクトルが得られた"),
+            ],
+            uploads=[
+                FileRef(filename="spectrum.csv",
+                        uri="https://elab.example.org/app/download.php?f=spectrum.csv",
+                        hash_b64="q6L6q6L6q6L6q6L6q6L6q6L6q6L6q6L6q6L6q6L6q6I=",
+                        hash_method="SHA-256"),
+            ],
+        ),
     ],
     elab_url="https://elab.example.org/experiments.php?mode=view&id=123",
 )

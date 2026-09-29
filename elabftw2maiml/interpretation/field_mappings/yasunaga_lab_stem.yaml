@@ -57,7 +57,7 @@ fields:
     semantic_type: imaging_mode
     data_type: string
     context: experiment
-    target: condition_properties
+    target: conditions
     required: true
 
   Aperture(µm):
@@ -66,7 +66,7 @@ fields:
     data_type: number
     unit: µm
     context: experiment
-    target: condition_properties
+    target: conditions
 
   Magnification:
     role: condition
@@ -74,7 +74,7 @@ fields:
     data_type: number
     unit: x
     context: experiment
-    target: condition_properties
+    target: conditions
     required: true
     # 値の文字列自体には単位が含まれない ("200000")。対応表のunitを補って正規化する。
 
@@ -84,7 +84,7 @@ fields:
     data_type: number
     unit: mm
     context: experiment
-    target: condition_properties
+    target: conditions
 
   AcceleratingVoltage(kV):
     role: condition
@@ -92,7 +92,7 @@ fields:
     data_type: number
     unit: kV
     context: experiment
-    target: condition_properties
+    target: conditions
     required: true
 
   ElectronDose(e⁻/Å²):
@@ -101,11 +101,11 @@ fields:
     data_type: number
     unit: e⁻/Å²
     context: experiment
-    target: condition_properties
+    target: conditions
 
   # --- RESULT --------------------------------------------------------------
   # eLabFTW上でユーザーがRESULTグループに分類したフィールドは、
-  # 現段階ではその分類を正としてMaiMLのresult_propertiesへ反映する。
+  # 現段階ではその分類を正としてMaiMLのresultsへ反映する。
   #
   # 各フィールドの科学的意味に基づく再分類は自動では行わない。
   # 将来、MaiML Protocolや運用ルールで分類が明示された場合に限り、
@@ -129,7 +129,7 @@ fields:
     semantic_type: detector_name
     data_type: string
     context: experiment
-    target: result_properties
+    target: results
 
   DwellTime:
     role: result
@@ -137,7 +137,7 @@ fields:
     data_type: number
     # 単位無しで正しいことを確認済み (上記注意参照)。unitは意図的に未設定。
     context: experiment
-    target: result_properties
+    target: results
 
   PixelSize:
     role: result
@@ -145,7 +145,7 @@ fields:
     data_type: number
     # 単位無しで正しいことを確認済み (上記注意参照)。unitは意図的に未設定。
     context: experiment
-    target: result_properties
+    target: results
 
   FrameCount:
     role: result
@@ -153,21 +153,21 @@ fields:
     data_type: number
     # 枚数なので単位なし (次元を持たない)。
     context: experiment
-    target: result_properties
+    target: results
 
   SignalType:
     role: result
     semantic_type: signal_type
     data_type: string
     context: experiment
-    target: result_properties
+    target: results
 
   ImageFormat:
     role: result
     semantic_type: image_format
     data_type: string
     context: experiment
-    target: result_properties
+    target: results
 
   AcquisitionTime:
     role: result
@@ -175,7 +175,7 @@ fields:
     data_type: number
     unit: s
     context: experiment
-    target: result_properties
+    target: results
 
   FieldofView(µm):
     role: result
@@ -183,7 +183,7 @@ fields:
     data_type: number
     unit: µm
     context: experiment
-    target: result_properties
+    target: results
 
   ImageWidth(pixel):
     role: result
@@ -191,7 +191,7 @@ fields:
     data_type: number
     unit: pixel
     context: experiment
-    target: result_properties
+    target: results
 
   ImageHeight(pixel):
     role: result
@@ -199,4 +199,4 @@ fields:
     data_type: number
     unit: pixel
     context: experiment
-    target: result_properties
+    target: results

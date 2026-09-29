@@ -12,7 +12,7 @@
     3. 自由記述側の言及が無いフィールドも、構造化フィールドのみで問題なく
        ExperimentDataへ反映されること (無条件に競合にはならないこと)。
     4. MATERIAL/CONDITION/RESULTの各グループが、期待した反映先
-       (materials/condition_properties/result_properties) に振り分けられること。
+       (materials/conditions/results) に振り分けられること。
 
 を確認する。
 """
@@ -160,27 +160,32 @@ class TestAppliedToExperimentDataByGroup:
         apply_interpretation_report(experiment, report)
 
         assert len(experiment.materials) == 1
+        assert experiment.materials[0].key == "material:experiment:44"
         material_keys = {p.key for p in experiment.materials[0].properties}
         assert "ns1:sample_id" in material_keys
         assert "ns1:sample_name" in material_keys
         assert "ns1:pretreatment_state" in material_keys
         assert "ns1:grid_pattern" in material_keys
 
-    def test_condition_fields_land_in_condition_properties(self):
+    def test_condition_fields_land_in_conditions(self):
         experiment, report, _ = _build_experiment_and_report(body_text="")
         apply_interpretation_report(experiment, report)
 
-        condition_keys = {p.key for p in experiment.condition_properties}
+        assert len(experiment.conditions) == 1
+        assert experiment.conditions[0].key == "condition:experiment:44"
+        condition_keys = {p.key for p in experiment.conditions[0].properties}
         assert condition_keys == {
             "ns1:imaging_mode", "ns1:objective_aperture", "ns1:magnification",
             "ns1:camera_length", "ns1:accelerating_voltage", "ns1:electron_dose",
         }
 
-    def test_result_fields_land_in_result_properties(self):
+    def test_result_fields_land_in_results(self):
         experiment, report, _ = _build_experiment_and_report(body_text="")
         apply_interpretation_report(experiment, report)
 
-        result_keys = {p.key for p in experiment.result_properties}
+        assert len(experiment.results) == 1
+        assert experiment.results[0].key == "result:experiment:44"
+        result_keys = {p.key for p in experiment.results[0].properties}
         assert result_keys == {
             "ns1:detector_name", "ns1:dwell_time", "ns1:pixel_size",
             "ns1:frame_count", "ns1:signal_type", "ns1:image_format",
@@ -214,7 +219,7 @@ class TestFreeTextAgreementStillWorks:
         conflict_types = {c.semantic_type for c in report.conflicts}
         assert "accelerating_voltage" in conflict_types
         apply_interpretation_report(experiment, report)
-        condition_keys = {p.key for p in experiment.condition_properties}
+        condition_keys = {p.key for c in experiment.conditions for p in c.properties}
         assert "ns1:accelerating_voltage" not in condition_keys
 
 

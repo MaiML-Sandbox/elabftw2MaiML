@@ -67,7 +67,7 @@ def test_structured_only_candidate_with_role_and_target_is_accepted():
     exp = _make_experiment()
     structured = InterpretationCandidate(
         semantic_type="temperature", value=50, unit="degC", source="custom_field",
-        confidence=1.0, context="experiment", role="condition", target="condition_properties",
+        confidence=1.0, context="experiment", role="condition", target="conditions",
     )
     pipeline = InterpretationPipeline()
 
@@ -84,7 +84,7 @@ def test_structured_and_free_text_agree_structured_accepted_free_text_unclassifi
     exp = _make_experiment(body_text="40℃で加熱した。")
     structured = InterpretationCandidate(
         semantic_type="temperature", value=40, unit="degC", source="custom_field",
-        confidence=1.0, context="experiment", role="condition", target="condition_properties",
+        confidence=1.0, context="experiment", role="condition", target="conditions",
     )
     pipeline = InterpretationPipeline()
 
@@ -103,7 +103,7 @@ def test_structured_and_free_text_conflict_neither_accepted_nor_unclassified():
     exp = _make_experiment(body_text="40℃で30分加熱した。")
     structured = InterpretationCandidate(
         semantic_type="temperature", value=50, unit="degC", source="custom_field",
-        confidence=1.0, context="experiment", role="condition", target="condition_properties",
+        confidence=1.0, context="experiment", role="condition", target="conditions",
     )
     pipeline = InterpretationPipeline()
 
@@ -141,7 +141,7 @@ def test_low_confidence_structured_candidate_is_unclassified_not_accepted():
     exp = _make_experiment()
     structured = InterpretationCandidate(
         semantic_type="temperature", value=50, unit="degC", source="custom_field",
-        confidence=0.5, context="experiment", role="condition", target="condition_properties",
+        confidence=0.5, context="experiment", role="condition", target="conditions",
     )
     pipeline = InterpretationPipeline(confidence_threshold=1.0)
 
@@ -155,7 +155,7 @@ def test_format_interpretation_report_smoke():
     exp = _make_experiment(body_text="40℃で30分加熱した。")
     structured = InterpretationCandidate(
         semantic_type="temperature", value=50, unit="degC", source="custom_field",
-        confidence=1.0, context="experiment", role="condition", target="condition_properties",
+        confidence=1.0, context="experiment", role="condition", target="conditions",
     )
     pipeline = InterpretationPipeline()
     report = pipeline.interpret_experiment(exp, structured_candidates=[structured])

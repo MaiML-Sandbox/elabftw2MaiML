@@ -25,7 +25,7 @@ fields:
     semantic_type: resolution
     role: condition
     context: experiment
-    target: condition_properties
+    target: conditions
 """
 
 

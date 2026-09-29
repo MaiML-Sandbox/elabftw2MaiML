@@ -62,8 +62,8 @@ class InterpretationCandidate:
         (例: 材料の質量 vs 測定条件としての質量) を区別できるようにする。
         未確定 (自由記述からの抽出直後など) の場合は None。
     target:
-        MaiMLへの実際の反映先 ("materials" / "condition_properties" /
-        "result_properties" 等)。role と対になる情報で、これも未確定なら None。
+        MaiMLへの実際の反映先 ("materials" / "conditions" /
+        "results" / "instrument" 等)。role と対になる情報で、これも未確定なら None。
         role/target が両方確定し、かつ競合が無く confidence が十分高い候補だけを
         自動反映してよい、という判断は呼び出し側 (interpretation/pipeline.py) が行う。
     raw_value:

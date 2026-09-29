@@ -1,10 +1,10 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <maiml xmlns="http://www.maiml.org/schemas" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:ns1="https://example.org/maiml/mylab" xmlns:concept="http://www.xes-standard.org/concept.xesext#" xmlns:lifecycle="http://www.xes-standard.org/lifecycle.xesext#" xmlns:time="http://www.xes-standard.org/time.xesext#" version="1.0" features="nested-attributes" xsi:type="maimlRootType">
   <document id="document_exp123">
-    <uuid>2c50b41f-dabd-4245-915d-1c7ea88ef1eb</uuid>
+    <uuid>567c13b8-374b-40ed-b821-73f3d67b32f4</uuid>
     <description>PMMA薄膜のFT-IR測定</description>
     <creator id="creator_instrument">
-      <uuid>f12c978a-d468-5be4-b806-287170773fb1</uuid>
+      <uuid>00431e48-20ea-57c4-9d6b-2ec01d27dd88</uuid>
       <description>ns1:elabftw-to-maiml</description>
       <vendorRef id="vref_creator" ref="vendor_of_creator"/>
     </creator>
@@ -19,12 +19,12 @@
     <date>2026-07-20T10:00:00+00:00</date>
   </document>
   <protocol id="protocol_exp123">
-    <uuid>16fb3a74-6858-4747-a320-68bb82f852e3</uuid>
+    <uuid>ae0029ff-0646-4dc8-b1a7-534745d5881c</uuid>
     <method id="method_exp123">
-      <uuid>41fa407d-357f-4e29-bbfd-58157fd157b8</uuid>
+      <uuid>58671b63-15ad-43ac-a1d2-154a6a8836ce</uuid>
       <description>PMMA薄膜のFT-IR測定</description>
       <pnml id="pnml_exp123">
-        <uuid>24c21c67-e54d-4553-a243-885203cc2374</uuid>
+        <uuid>6cd2dead-7fa2-4345-92ad-89daa77a30fa</uuid>
         <place id="p_material_in"/>
         <place id="p_condition_in"/>
         <place id="p_mid_501"/>
@@ -38,19 +38,19 @@
         <arc id="a5" source="t_step_502" target="p_result_out"/>
       </pnml>
       <program id="prog_exp123">
-        <uuid>9a38b1ba-183f-4a41-8b45-bcb7a637dd4e</uuid>
+        <uuid>6a931f46-493e-46e1-9b61-2cd3e6c04be2</uuid>
         <instruction id="instr_step_501">
-          <uuid>6551f8fb-c900-4d12-93db-1eb3a76f28ea</uuid>
+          <uuid>10bff3fb-c49e-4480-8371-e20f97781b10</uuid>
           <description>サンプル準備</description>
           <transitionRef id="tref_t_step_501" ref="t_step_501"/>
         </instruction>
         <instruction id="instr_step_502">
-          <uuid>a9cd5532-ab82-492b-8c87-413efe3df3f0</uuid>
+          <uuid>49dced44-a077-4346-a882-1d6cc084d598</uuid>
           <description>FT-IR測定</description>
           <transitionRef id="tref_t_step_502" ref="t_step_502"/>
         </instruction>
-        <materialTemplate id="mattmpl_88">
-          <uuid>9bcae85a-6dc2-4a2f-a4fd-eb46816840c6</uuid>
+        <materialTemplate id="mattmpl_material_item_88">
+          <uuid>c0bdd3cd-490a-4574-a384-a00edcaae722</uuid>
           <description>PMMAサンプル</description>
           <property key="ns1:SampleID" xsi:type="stringType">
             <value>SA-001</value>
@@ -58,25 +58,24 @@
           <property key="ns1:Thickness" xsi:type="doubleType" formatString="0.000" units="mm">
             <value>0.125</value>
           </property>
-          <placeRef id="pref_mat_88" ref="p_material_in"/>
+          <placeRef id="pref_mat_material_item_88" ref="p_material_in"/>
         </materialTemplate>
-        <conditionTemplate id="condtmpl_exp123">
-          <uuid>57b6b77d-4623-4cbe-a10f-4cf969c47f50</uuid>
+        <conditionTemplate id="condtmpl_condition_experiment_123">
+          <uuid>952ec2d1-3ba3-470f-87e2-8c2057d76d52</uuid>
           <property key="ns1:Resolution" xsi:type="doubleType" formatString="0.00" units="cm-1">
             <value>4.00</value>
           </property>
           <property key="ns1:Scans" xsi:type="intType">
             <value>32</value>
           </property>
-          <placeRef id="pref_cond" ref="p_condition_in"/>
+          <placeRef id="pref_cond_condition_experiment_123" ref="p_condition_in"/>
         </conditionTemplate>
         <resultTemplate id="restmpl_step_501">
-          <uuid>2432e114-6dc5-4b5f-896f-ad36bf33b5e9</uuid>
+          <uuid>e7ce4898-3ea5-4dca-af20-cc114d26fbf6</uuid>
           <placeRef id="pref_res_501" ref="p_mid_501"/>
-          <templateRef id="tref_restmpl_step_501" ref="mattmpl_88"/>
         </resultTemplate>
         <resultTemplate id="restmpl_step_502">
-          <uuid>bd0bf9f6-29a2-442d-a916-1b6a9fc222c4</uuid>
+          <uuid>66ecb3fe-243e-4c29-af62-702e68884376</uuid>
           <property key="ns1:Note" xsi:type="stringType">
             <value>良好なスペクトルが得られた</value>
           </property>
@@ -87,11 +86,11 @@
     </method>
   </protocol>
   <data id="data_exp123">
-    <uuid>cb1f56fa-cd42-4355-9ec4-162152bf8451</uuid>
+    <uuid>40893c9e-256d-48fd-9e3e-ecae9614c527</uuid>
     <results id="results_exp123">
-      <uuid>b492d1dd-ece9-45b4-b4f6-ccd7701ddcfc</uuid>
-      <material id="material_88" ref="mattmpl_88">
-        <uuid>27d2be0d-7fa4-4faf-b6d0-3ef8eb6f373f</uuid>
+      <uuid>cecefbb1-2f92-46d4-810f-feff23bc84d2</uuid>
+      <material id="material_material_item_88" ref="mattmpl_material_item_88">
+        <uuid>1677a72b-deef-46bb-b803-9a1f0ff6904c</uuid>
         <description>PMMAサンプル</description>
         <property key="ns1:SampleID" xsi:type="stringType">
           <value>SA-001</value>
@@ -100,8 +99,8 @@
           <value>0.125</value>
         </property>
       </material>
-      <condition id="condition_exp123" ref="condtmpl_exp123">
-        <uuid>e9df5ada-f5e4-4390-97a2-7c8e90151706</uuid>
+      <condition id="condition_condition_experiment_123" ref="condtmpl_condition_experiment_123">
+        <uuid>1516b8b5-d37f-4809-acec-b18f6ca278df</uuid>
         <property key="ns1:Resolution" xsi:type="doubleType" formatString="0.00" units="cm-1">
           <value>4.00</value>
         </property>
@@ -110,11 +109,10 @@
         </property>
       </condition>
       <result id="result_step_501" ref="restmpl_step_501">
-        <uuid>ee2a121f-31fa-4adb-84e3-4818ffba118c</uuid>
-        <instanceRef id="iref_result_step_501" ref="material_88"/>
+        <uuid>ad70ee6c-6912-4581-8975-5f484efd5e10</uuid>
       </result>
       <result id="result_step_502" ref="restmpl_step_502">
-        <uuid>dd2e4246-a2e6-4cb8-bd5d-23307cf0217f</uuid>
+        <uuid>adc76049-8f56-47a0-989a-5c7a1153d0cb</uuid>
         <insertion>
           <uri>https://elab.example.org/app/download.php?f=spectrum.csv</uri>
           <hash method="SHA-256">q6L6q6L6q6L6q6L6q6L6q6L6q6L6q6L6q6L6q6L6q6I=</hash>
@@ -127,15 +125,15 @@
     </results>
   </data>
   <eventLog id="eventLog_exp123">
-    <uuid>904698eb-9455-4546-b902-89e091c41610</uuid>
+    <uuid>30f2c91d-a4d9-451c-b3db-40083c9bd372</uuid>
     <log id="log_exp123" ref="method_exp123">
-      <uuid>4fa330ea-f410-4349-be7c-6f3a97b800ab</uuid>
+      <uuid>7eab2003-c74f-4ca6-b115-f3fbbe7c8a97</uuid>
       <trace id="trace_exp123" ref="prog_exp123">
-        <uuid>1e37ab91-60c0-42f8-a3ea-62a2492de306</uuid>
+        <uuid>2be4a877-efbc-4bb4-adf6-478d354a7ee6</uuid>
         <event id="event_start_501" ref="instr_step_501">
-          <uuid>4e35e794-2d1c-4b8c-90fa-8b0f2de6b0b7</uuid>
+          <uuid>5db7b069-2401-4e60-997c-65c2761c2564</uuid>
           <property key="concept:instance" xsi:type="uuidType">
-            <value>7630319e-0e9b-4df4-aa29-8e51a6562316</value>
+            <value>2ce521c0-e25e-424c-b77b-73f1c12a3891</value>
           </property>
           <property key="lifecycle:transition" xsi:type="stringType">
             <value>start</value>
@@ -145,9 +143,9 @@
           </property>
         </event>
         <event id="event_complete_501" ref="instr_step_501">
-          <uuid>103b6aec-a93a-4f77-91e6-99a049020c27</uuid>
+          <uuid>2c082a5f-6124-491f-920b-7587c398e6b9</uuid>
           <property key="concept:instance" xsi:type="uuidType">
-            <value>7630319e-0e9b-4df4-aa29-8e51a6562316</value>
+            <value>2ce521c0-e25e-424c-b77b-73f1c12a3891</value>
           </property>
           <property key="lifecycle:transition" xsi:type="stringType">
             <value>complete</value>
@@ -157,9 +155,9 @@
           </property>
         </event>
         <event id="event_start_502" ref="instr_step_502">
-          <uuid>e7e19b1f-fe30-4a36-88ca-2032965768aa</uuid>
+          <uuid>ac7f9c4f-f8a8-4211-a72b-ad92517bb2f5</uuid>
           <property key="concept:instance" xsi:type="uuidType">
-            <value>90be7d67-17cd-4ae5-855a-228d2dc25a88</value>
+            <value>1dfcbe14-9a75-45a7-b875-7697986ad581</value>
           </property>
           <property key="lifecycle:transition" xsi:type="stringType">
             <value>start</value>
@@ -169,9 +167,9 @@
           </property>
         </event>
         <event id="event_complete_502" ref="instr_step_502">
-          <uuid>2b92a5a8-6ae8-4596-9a1c-df6c86e5118b</uuid>
+          <uuid>bb330478-437e-47ca-94a7-eb80cfdc6e64</uuid>
           <property key="concept:instance" xsi:type="uuidType">
-            <value>90be7d67-17cd-4ae5-855a-228d2dc25a88</value>
+            <value>1dfcbe14-9a75-45a7-b875-7697986ad581</value>
           </property>
           <property key="lifecycle:transition" xsi:type="stringType">
             <value>complete</value>

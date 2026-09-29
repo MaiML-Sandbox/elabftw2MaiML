@@ -78,7 +78,7 @@ class FieldMapping:
             semantic_type: accelerating_voltage
             unit: kV
             context: sem_acquisition
-            target: condition_properties
+            target: conditions
             required: true
     """
 

@@ -22,8 +22,22 @@
     }
   ],
   "materials": [],
-  "condition_properties": [],
-  "result_properties": [],
-  "uploads": [],
+  "conditions": [
+    {
+      "key": "condition:experiment:200",
+      "title": null,
+      "properties": [],
+      "step_id": null
+    }
+  ],
+  "results": [
+    {
+      "key": "result:experiment:200",
+      "title": null,
+      "properties": [],
+      "step_id": null,
+      "uploads": []
+    }
+  ],
   "elab_url": "https://elab.example.org/experiments.php?mode=view&id=200"
 }

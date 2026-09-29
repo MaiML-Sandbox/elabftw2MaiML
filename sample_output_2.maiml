@@ -1,13 +1,13 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <maiml xmlns="http://www.maiml.org/schemas" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:ns1="https://example.org/maiml/mylab" xmlns:concept="http://www.xes-standard.org/concept.xesext#" xmlns:lifecycle="http://www.xes-standard.org/lifecycle.xesext#" xmlns:time="http://www.xes-standard.org/time.xesext#" version="1.0" features="nested-attributes" xsi:type="maimlRootType">
   <document id="document_exp124">
-    <uuid>2e3ff858-2f41-4f90-8e04-d0e842a05f8d</uuid>
+    <uuid>95d4938d-4bbc-4ab3-8343-d71e662070ad</uuid>
     <description>汎用天秤による秤量</description>
     <creator id="creator_instrument">
       <uuid>f038084c-c7c1-5ed9-b04f-70dd5d5028f4</uuid>
       <description>FT-IR IRAffinity-1S</description>
       <vendorRef id="vref_creator" ref="vendor_of_creator"/>
-      <instrumentRef id="iref_creator" ref="instrument_general"/>
+      <instrumentRef id="iref_creator_1" ref="instrument_1"/>
     </creator>
     <vendor id="vendor_of_creator">
       <uuid>490fe155-fb98-5481-ba4c-aca86689e156</uuid>
@@ -17,19 +17,19 @@
       <uuid>d038334f-f81e-5600-a765-3271ef56ed0a</uuid>
       <description>Suzuki Hanako</description>
     </owner>
-    <instrument id="instrument_general">
+    <instrument id="instrument_1">
       <uuid>9c9eb4ec-431f-5c1c-98d6-5afc689e5888</uuid>
       <description>FT-IR IRAffinity-1S</description>
     </instrument>
     <date>2026-07-21T09:00:00+00:00</date>
   </document>
   <protocol id="protocol_exp124">
-    <uuid>cde3f3f0-7d2b-449d-9e26-1d93918f2925</uuid>
+    <uuid>133fc14b-c616-4266-9eb0-0194c1136a7c</uuid>
     <method id="method_exp124">
-      <uuid>0c97807e-81ba-4cde-ae8e-3737e6bb98ef</uuid>
+      <uuid>06ba7bd6-d9c4-42b7-bcf5-62a03c92bad0</uuid>
       <description>汎用天秤による秤量</description>
       <pnml id="pnml_exp124">
-        <uuid>16102a8c-f2dc-48e9-9758-585612e37b74</uuid>
+        <uuid>c0ff59aa-e898-42c2-bf48-d21549085d20</uuid>
         <place id="p_material_in"/>
         <place id="p_condition_in"/>
         <place id="p_result_out"/>
@@ -39,56 +39,54 @@
         <arc id="a3" source="t_step_601" target="p_result_out"/>
       </pnml>
       <program id="prog_exp124">
-        <uuid>f3eb5ffd-101f-41e0-806d-8e9e11fd4fc6</uuid>
+        <uuid>081070a3-fb0e-466c-9a36-ef2d222f835b</uuid>
         <instruction id="instr_step_601">
-          <uuid>dc143e20-41e7-4123-aaaa-5600b4a7defd</uuid>
+          <uuid>1fd879a3-b80e-4790-b831-0974f9f7547d</uuid>
           <description>秤量</description>
           <transitionRef id="tref_t_step_601" ref="t_step_601"/>
         </instruction>
-        <materialTemplate id="mattmpl_0">
-          <uuid>e7e87c11-26a8-4d89-821e-0a5cb0de7846</uuid>
+        <materialTemplate id="mattmpl_material_default">
+          <uuid>71d35db0-66e0-47c5-95e6-c9601f7f81d0</uuid>
           <description>(no linked item)</description>
-          <placeRef id="pref_mat_0" ref="p_material_in"/>
+          <placeRef id="pref_mat_material_default" ref="p_material_in"/>
         </materialTemplate>
-        <conditionTemplate id="condtmpl_exp124">
-          <uuid>36f9d99f-21e8-45bd-95ba-2b3277abd964</uuid>
-          <placeRef id="pref_cond" ref="p_condition_in"/>
+        <conditionTemplate id="condtmpl_condition_default">
+          <uuid>ba332ac3-c564-4ddd-8a5a-798e5bb3905e</uuid>
+          <placeRef id="pref_cond_condition_default" ref="p_condition_in"/>
         </conditionTemplate>
         <resultTemplate id="restmpl_step_601">
-          <uuid>1d0f4f38-9aab-4528-94f6-0f593fe74213</uuid>
+          <uuid>6ccea126-c865-4997-9a61-ea25d553a96e</uuid>
           <placeRef id="pref_res_601" ref="p_result_out"/>
-          <templateRef id="tref_restmpl_step_601" ref="mattmpl_0"/>
         </resultTemplate>
       </program>
     </method>
   </protocol>
   <data id="data_exp124">
-    <uuid>8de72522-d45e-4783-82fb-83710cab1dfd</uuid>
+    <uuid>f305063d-d49d-48a1-8e79-4e35c95a9e8a</uuid>
     <results id="results_exp124">
-      <uuid>5da3df6c-2423-4406-90c5-94c8a98ca177</uuid>
-      <material id="material_0" ref="mattmpl_0">
-        <uuid>8cc1037d-a981-4ae8-8f32-b1df001c5934</uuid>
+      <uuid>11ccda62-f5f5-496c-ba92-65f1bc3db526</uuid>
+      <material id="material_material_default" ref="mattmpl_material_default">
+        <uuid>16536037-4ef9-473b-b690-3454d639c2c9</uuid>
         <description>(no linked item)</description>
       </material>
-      <condition id="condition_exp124" ref="condtmpl_exp124">
-        <uuid>c0b8b107-d9e6-4306-9f68-346fb9294b90</uuid>
+      <condition id="condition_condition_default" ref="condtmpl_condition_default">
+        <uuid>029af8ec-4b27-46ec-839a-273afdd4ea48</uuid>
       </condition>
       <result id="result_step_601" ref="restmpl_step_601">
-        <uuid>3e6fd75d-28de-4f80-9fb9-e9c8a49eca9a</uuid>
-        <instanceRef id="iref_result_step_601" ref="material_0"/>
+        <uuid>c4f9f946-0121-4cff-b5a1-3719f0d5bd26</uuid>
       </result>
     </results>
   </data>
   <eventLog id="eventLog_exp124">
-    <uuid>2b7a11e5-ca18-43d1-8838-4d139bcc4656</uuid>
+    <uuid>5c97c94d-d840-460a-85eb-09db4ccbfb16</uuid>
     <log id="log_exp124" ref="method_exp124">
-      <uuid>2aecf1c6-6c77-4a2b-9e49-9329796acf62</uuid>
+      <uuid>6d974295-45bb-48cc-8158-67db1476a372</uuid>
       <trace id="trace_exp124" ref="prog_exp124">
-        <uuid>7c0969c8-1a7f-4ca9-b7f5-33663014cf91</uuid>
+        <uuid>fa2ee822-cff7-4909-831a-c8e4864312f6</uuid>
         <event id="event_start_601" ref="instr_step_601">
-          <uuid>95fa03ad-783d-49ef-9fae-0618667ba7cb</uuid>
+          <uuid>0c7cb447-513d-4d23-bdc5-1d796738fc33</uuid>
           <property key="concept:instance" xsi:type="uuidType">
-            <value>1c68aa02-83ef-40dd-ab7c-1da5f7b2fd5b</value>
+            <value>1c2ffb9d-de79-4e33-8c7f-76fc19a39b01</value>
           </property>
           <property key="lifecycle:transition" xsi:type="stringType">
             <value>start</value>
@@ -98,9 +96,9 @@
           </property>
         </event>
         <event id="event_complete_601" ref="instr_step_601">
-          <uuid>52830f8f-07df-4df1-9f84-dbf67d16e21c</uuid>
+          <uuid>f2cc9519-6e6b-49a2-a97a-81833b454aa1</uuid>
           <property key="concept:instance" xsi:type="uuidType">
-            <value>1c68aa02-83ef-40dd-ab7c-1da5f7b2fd5b</value>
+            <value>1c2ffb9d-de79-4e33-8c7f-76fc19a39b01</value>
           </property>
           <property key="lifecycle:transition" xsi:type="stringType">
             <value>complete</value>

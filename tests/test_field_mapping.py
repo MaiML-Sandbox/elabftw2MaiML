@@ -42,7 +42,7 @@ def _simple_mapping() -> FieldMapping:
                     "role": "condition",
                     "semantic_type": "accelerating_voltage",
                     "unit": "kV",
-                    "target": "condition_properties",
+                    "target": "conditions",
                     "required": True,
                 },
                 "試料ID": {
@@ -64,7 +64,7 @@ class TestFieldMappingFromDict:
         assert rule.semantic_type == "accelerating_voltage"
         assert rule.role == "condition"
         assert rule.unit == "kV"
-        assert rule.target == "condition_properties"
+        assert rule.target == "conditions"
         assert rule.required is True
 
     def test_lookup_by_alias(self):
@@ -220,7 +220,7 @@ class TestCandidateFromFieldNormalization:
         assert candidate.value == Decimal("200")
         assert candidate.unit == "kV"
         assert candidate.role == "condition"
-        assert candidate.target == "condition_properties"
+        assert candidate.target == "conditions"
         assert candidate.reason is None
 
     def test_value_with_embedded_unit_no_space_is_normalized(self):

@@ -22,7 +22,7 @@ from typing import Optional
 import elabapi_python
 from elabapi_python.rest import ApiException
 
-from .model import ExperimentData, Party, PropertyValue, LinkedItem, Step, FileRef
+from .model import ConditionData, ExperimentData, FileRef, MaterialData, Party, PropertyValue, ResultData, Step
 from .interpretation import (
     StructuredRuleInterpreter,
     DEFAULT_ROLE_CATEGORY_CANDIDATES,
@@ -380,7 +380,7 @@ class ElabftwClient:
                              role_tag_candidates: Optional[dict] = None,
                              max_depth: int = 2) -> dict:
         """
-        戻り値: {"material": [LinkedItem, ...],
+        戻り値: {"material": [MaterialData, ...],
                  "condition": [(link, raw_item, props), ...],
                  "result": [(link, raw_item, props), ...],
                  "creator": [(link, raw_item), ...],
@@ -425,7 +425,8 @@ class ElabftwClient:
                     if raw_item is not None and not item_props:
                         print(f"{indent}[情報] リンクされたアイテム #{entityid} ({link.title}) に"
                               f"カスタムフィールドが見つかりませんでした。")
-                    buckets["material"].append(LinkedItem(
+                    buckets["material"].append(MaterialData(
+                        key=f"material:item:{entityid}",
                         elab_id=entityid,
                         title=link.title,
                         category=category_title,
@@ -536,7 +537,10 @@ class ElabftwClient:
         condition/resultの決定:
             実験のExtra Fields (condition) / 実験本文・タグ (result) に加え、
             カテゴリ/タグから "condition"/"result" と判定されたリンクアイテムの
-            カスタムフィールドも、それぞれconditionTemplate/resultTemplateにマージする。
+            カスタムフィールドも、それぞれ実験全体を表す1つのConditionData/
+            ResultDataにマージする (--field-mapping による複数Condition/Step単位
+            Resultへの分割は interpretation.apply 側の責務。README「対応表による
+            構造化フィールド・自由記述の統合」参照)。
         """
         experiment = self.experiments_api.get_experiment(experiment_id)
         raw_experiment = self._get_raw_json(f"/experiments/{experiment_id}")
@@ -607,9 +611,13 @@ class ElabftwClient:
         )
 
         # -- material: リンクアイテム由来のmaterialsに加え、MATERIALグループの自己カスタムフィールド
-        #    があれば、実験自身を表す合成LinkedItemとしてmaterialsに追加する ---------------------
+        #    があれば、実験自身を表す合成MaterialDataとしてmaterialsに追加する。key規約
+        #    ("material:experiment:<id>") は interpretation.apply._container_key() と
+        #    共通なので、--field-mapping 経由の実験全体向けmaterial候補もここに自動的に
+        #    マージされ、二重にオブジェクトが分裂しない -------------------------------------
         if own_fields["material"]:
-            materials = list(materials) + [LinkedItem(
+            materials = list(materials) + [MaterialData(
+                key=f"material:experiment:{experiment.id}",
                 elab_id=0,
                 title=experiment.title,
                 category="(experiment own MATERIAL fields)",
@@ -658,6 +666,21 @@ class ElabftwClient:
         exp_date = _parse_dt(getattr(experiment, "_date", None) or experiment.created_at) \
             or datetime.utcnow()
 
+        # -- 実験全体を表す既定の ConditionData / ResultData を1つずつ用意する。
+        #    key規約 ("condition:experiment:<id>" / "result:experiment:<id>") は
+        #    interpretation.apply._container_key() の既定context (EXPERIMENT_CONTEXT)
+        #    と共通であり、--field-mapping 経由の実験全体向け候補もここへ自動的にマージされる。
+        #    (Step単位の複数Condition/Resultへの分割は interpretation.apply 側の責務)
+        conditions = [ConditionData(
+            key=f"condition:experiment:{experiment.id}",
+            properties=condition_props,
+        )]
+        results = [ResultData(
+            key=f"result:experiment:{experiment.id}",
+            properties=result_props,
+            uploads=uploads,
+        )]
+
         return ExperimentData(
             elab_id=experiment.id,
             title=experiment.title,
@@ -669,9 +692,8 @@ class ElabftwClient:
             instruments=instrument_parties,
             steps=steps,
             materials=materials,
-            condition_properties=condition_props,
-            result_properties=result_props,
-            uploads=uploads,
+            conditions=conditions,
+            results=results,
             elab_url=f"{self.base_url}/experiments.php?mode=view&id={experiment.id}",
         )
 

@@ -4,6 +4,48 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Breaking
+
+- データモデル対称化改修 (`elabftw2MaiML_model_refactoring_plan.md`)。
+  `material`/`condition`/`result`の3種類を、MaiML本体 (template/instance) と
+  同じ「オブジェクト + properties」という対称な形に揃えた。
+  - `ExperimentData.materials: list[LinkedItem]` /
+    `condition_properties: list[PropertyValue]` /
+    `result_properties: list[PropertyValue]` を廃止し、
+    `materials: list[MaterialData]` / `conditions: list[ConditionData]` /
+    `results: list[ResultData]` に統一 (いずれも`key`/`title`/
+    `properties`等を持つ共通形状)。`LinkedItem`は削除し、その役割は
+    `MaterialData`に統合した。
+  - `key`フィールドを追加。クライアント側 (`elabftw_client.py`) が作った
+    オブジェクトと、`--field-mapping`による解釈結果 (`interpretation/apply.py`)
+    が作るオブジェクトを、同じ`key`のとき自動的に1つへマージする
+    (実験全体は`f"{material|condition|result}:experiment:{elab_id}"`、
+    Step単位は`f"{material|condition|result}:step:{step_id}"`という規約)。
+  - 複数Conditionsオブジェクト、およびStep単位の`ResultData`
+    (`ResultData.step_id`によるStepごとの`resultTemplate`/`result`への
+    振り分け) に対応。**ただしStep単位ConditionとPNMLのtransition/place
+    との対応付けは今回のスコープ外**であり、`ConditionData.step_id`は現時点
+    ではメタデータとして保持されるのみ (全てのConditionTemplateは引き続き
+    最初のSTEPが消費する共有placeへ接続される。今後の拡張ポイント)。
+  - `interpretation/apply.py`の`materials`/`conditions`/`results`向け
+    反映処理を、個別の特別扱いをやめて汎用的なコンテナ解決処理
+    (`_find_or_create_container()`) に統一。
+  - `--field-mapping`用YAMLの`target`値を`condition_properties`/
+    `result_properties`から`conditions`/`results`へ改名。
+    **旧target名の後方互換 (alias) は用意していない**:
+    既存の対応表YAMLで`target: condition_properties`/
+    `target: result_properties`を使っている場合は、それぞれ
+    `target: conditions`/`target: results`へ書き換えが必要
+    (書き換えないと反映されずログに警告が出るだけになる)。
+    同梱の対応表 (`elabftw2maiml/interpretation/field_mappings/`配下) は
+    書き換え済み。
+  - 上記に伴い、既存のテスト・goldenスナップショット
+    (`tests/golden/*.json`, `tests/golden/*.maiml`) を新モデルに合わせて
+    更新・再生成。
+  - スコープ外: confidence計算・confidenceしきい値・正規表現による
+    自由記述抽出・LLMによる解釈・semantic_typeの分類体系自体・MaiMLのXSD
+    (いずれも変更していない)。
+
 ### Changed
 
 - `elabftw2maiml/interpretation/field_mappings/yasunaga_lab_stem.yaml` の

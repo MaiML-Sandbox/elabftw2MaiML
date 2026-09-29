@@ -118,7 +118,7 @@ class TestRoleAwareConflictDetection:
             _candidate(semantic_type="mass", value=10, unit="mg",
                        source="custom_field", role="material", target="materials"),
             _candidate(semantic_type="mass", value=9.8, unit="mg",
-                       source="custom_field", role="result", target="result_properties"),
+                       source="custom_field", role="result", target="results"),
         ]
         assert detect_conflicts(candidates) == []
 
@@ -127,7 +127,7 @@ class TestRoleAwareConflictDetection:
         比較対象になり、値が食い違えば競合として検出される。"""
         candidates = [
             _candidate(semantic_type="accelerating_voltage", value=200, unit="kV",
-                       source="custom_field", role="condition", target="condition_properties"),
+                       source="custom_field", role="condition", target="conditions"),
             _candidate(semantic_type="accelerating_voltage", value=250, unit="kV",
                        source="free_text_regex", role=None, target=None),
         ]
@@ -138,9 +138,9 @@ class TestRoleAwareConflictDetection:
     def test_same_role_different_value_still_conflicts(self):
         candidates = [
             _candidate(semantic_type="accelerating_voltage", value=200, unit="kV",
-                       source="custom_field", role="condition", target="condition_properties"),
+                       source="custom_field", role="condition", target="conditions"),
             _candidate(semantic_type="accelerating_voltage", value=250, unit="kV",
-                       source="free_text_regex", role="condition", target="condition_properties"),
+                       source="free_text_regex", role="condition", target="conditions"),
         ]
         conflicts = detect_conflicts(candidates)
         assert len(conflicts) == 1
@@ -159,7 +159,7 @@ class TestRoleAwareConflictDetection:
         扱う。"""
         candidates = [
             _candidate(semantic_type="note", value="A", source="custom_field",
-                       role="result", target="result_properties"),
+                       role="result", target="results"),
             _candidate(semantic_type="note", value="B", source="custom_field",
                        role="result", target="materials"),
         ]

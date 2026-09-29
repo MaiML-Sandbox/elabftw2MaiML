@@ -40,7 +40,7 @@ fields:
     semantic_type: accelerating_voltage
     data_type: number
     unit: kV
-    target: condition_properties
+    target: conditions
     required: true
     # SEM/TEM共通。contextはGroupから付与する (sem_acquisition/tem_acquisition)。
 
@@ -49,7 +49,7 @@ fields:
     role: condition
     semantic_type: imaging_mode
     data_type: string
-    target: condition_properties
+    target: conditions
     required: true
     # SEM/TEM共通。値の語彙は装置により異なる (SE/BSE等 vs BF-TEM/HRTEM等)。
 
@@ -59,7 +59,7 @@ fields:
     semantic_type: magnification
     data_type: number
     unit: x
-    target: condition_properties
+    target: conditions
     required: true
     # SEM/TEM共通。
 
@@ -70,7 +70,7 @@ fields:
     data_type: number
     unit: mm
     context: sem_acquisition
-    target: condition_properties
+    target: conditions
 
   検出器:
     aliases: [Detector]
@@ -87,7 +87,7 @@ fields:
     semantic_type: sem_image
     data_type: file
     context: sem_acquisition
-    target: result_properties
+    target: results
     required: true
 
   粒径:
@@ -96,7 +96,7 @@ fields:
     semantic_type: particle_size
     data_type: number
     unit: nm
-    target: result_properties
+    target: results
     # SEM/TEM共通。contextはGroupから付与する (sem_analysis/tem_analysis)。
 
   表面形態所見:
@@ -105,7 +105,7 @@ fields:
     semantic_type: morphology_observation
     data_type: string
     context: sem_analysis
-    target: result_properties
+    target: results
 
   # --- TEM MVP (5節・10節) ---------------------------------------------------
   TEMグリッド:
@@ -124,7 +124,7 @@ fields:
     data_type: number
     unit: mm
     context: tem_diffraction
-    target: condition_properties
+    target: conditions
 
   TEM画像:
     aliases: [TEM Image]
@@ -132,7 +132,7 @@ fields:
     semantic_type: tem_image
     data_type: file
     context: tem_acquisition
-    target: result_properties
+    target: results
     required: true
 
   回折像:
@@ -141,7 +141,7 @@ fields:
     semantic_type: diffraction_pattern
     data_type: file
     context: tem_diffraction
-    target: result_properties
+    target: results
 
   格子縞間隔:
     aliases: [Lattice Spacing, d-spacing]
@@ -150,7 +150,7 @@ fields:
     data_type: number
     unit: nm
     context: tem_analysis
-    target: result_properties
+    target: results
 
   結晶相:
     aliases: [Crystal Phase]
@@ -158,4 +158,4 @@ fields:
     semantic_type: crystal_phase
     data_type: string
     context: tem_analysis
-    target: result_properties
+    target: results

@@ -1,20 +1,28 @@
-"""`elabftw2maiml/interpretation/apply.py` (Phase 5-3: InterpretationReportの
-`accepted`候補をExperimentDataへ反映する) の単体テスト。
+"""`elabftw2maiml/interpretation/apply.py` (InterpretationReportの`accepted`候補を
+ExperimentDataへ反映する) の単体テスト。
 
 重点的に確認する点:
 
-1. `target`ごとの反映先 (condition_properties/result_properties/materials/
-   instrument) に正しく反映されること。
+1. `target`ごとの反映先 (materials/conditions/results/instrument) に正しく
+   反映されること。materials/conditions/resultsの3つは、対応する
+   MaterialData/ConditionData/ResultDataオブジェクト (`candidate.context`から
+   決まる) の`properties`に追加される、という共通の経路で処理される
+   (elabftw2MaiML_model_refactoring_plan.md によるデータモデル対称化)。
 2. 既に同じキーが存在する場合は上書きせずスキップすること (development plan
    9節「一方で他方を上書きしない」という既存方針をExperimentDataへの反映段階
    でも維持する)。
 3. `report.accepted`以外 (`conflicts`/`unclassified`) は絶対に反映しないこと。
-4. `materials`への反映は、既存の`elabftw_client.py`のelab_id=0合成アイテムの
-   規約に合わせ、複数の候補が1つの合成アイテムにまとめられること。
+4. `materials`への反映は、既存の`elabftw_client.py`の実験自身向け合成
+   MaterialData (key="material:experiment:<id>", elab_id=0) の規約に合わせ、
+   複数の候補が1つのオブジェクトにまとめられること。
+5. 異なるStep (`context="step:<id>"`) 由来の同じsemantic_typeの値は、
+   別々のConditionData/ResultDataオブジェクトとして独立して保持されること
+   (対称化改修前は単一のフラットなリストにキーのサフィックスで区別して
+   共存させていたが、改修後はオブジェクト自体が分かれるためサフィックスは不要)。
 """
 from datetime import datetime
 
-from elabftw2maiml.model import ExperimentData, LinkedItem, PropertyValue
+from elabftw2maiml.model import ExperimentData, MaterialData, PropertyValue
 from elabftw2maiml.interpretation.conflict import InterpretationCandidate, Conflict
 from elabftw2maiml.interpretation.pipeline import InterpretationReport, step_context
 from elabftw2maiml.interpretation.apply import apply_interpretation_report
@@ -39,13 +47,13 @@ def _accepted_candidate(**overrides) -> InterpretationCandidate:
         unit="kV",
         context="experiment",
         role="condition",
-        target="condition_properties",
+        target="conditions",
     )
     defaults.update(overrides)
     return InterpretationCandidate(**defaults)
 
 
-class TestConditionAndResultProperties:
+class TestConditionsAndResultsTargets:
     def test_condition_property_is_added(self):
         exp = _make_experiment()
         candidate = _accepted_candidate()
@@ -53,8 +61,10 @@ class TestConditionAndResultProperties:
 
         logs = apply_interpretation_report(exp, report)
 
-        assert len(exp.condition_properties) == 1
-        prop = exp.condition_properties[0]
+        assert len(exp.conditions) == 1
+        assert exp.conditions[0].key == "condition:experiment:1"
+        assert len(exp.conditions[0].properties) == 1
+        prop = exp.conditions[0].properties[0]
         assert prop.key == "ns1:accelerating_voltage"
         assert prop.value == 200
         assert prop.units == "kV"
@@ -65,34 +75,41 @@ class TestConditionAndResultProperties:
         exp = _make_experiment()
         candidate = _accepted_candidate(
             semantic_type="particle_size", value=120, unit="nm",
-            role="result", target="result_properties",
+            role="result", target="results",
         )
         report = InterpretationReport(accepted=[candidate])
 
         apply_interpretation_report(exp, report)
 
-        assert len(exp.result_properties) == 1
-        assert exp.result_properties[0].key == "ns1:particle_size"
+        assert len(exp.results) == 1
+        assert exp.results[0].key == "result:experiment:1"
+        assert exp.results[0].properties[0].key == "ns1:particle_size"
 
     def test_string_value_uses_string_type_and_no_units(self):
         exp = _make_experiment()
         candidate = _accepted_candidate(
             semantic_type="imaging_mode", value="HAADF-STEM", unit=None,
-            role="condition", target="condition_properties",
+            role="condition", target="conditions",
         )
         report = InterpretationReport(accepted=[candidate])
 
         apply_interpretation_report(exp, report)
 
-        prop = exp.condition_properties[0]
+        prop = exp.conditions[0].properties[0]
         assert prop.xsi_type == "stringType"
         assert prop.units is None
 
     def test_duplicate_key_is_skipped_not_overwritten(self):
+        from elabftw2maiml.model import ConditionData
         exp = _make_experiment(
-            condition_properties=[
-                PropertyValue(key="ns1:accelerating_voltage", xsi_type="doubleType",
-                              value=999, units="kV")
+            conditions=[
+                ConditionData(
+                    key="condition:experiment:1",
+                    properties=[
+                        PropertyValue(key="ns1:accelerating_voltage", xsi_type="doubleType",
+                                      value=999, units="kV")
+                    ],
+                )
             ]
         )
         candidate = _accepted_candidate(value=200)
@@ -101,8 +118,9 @@ class TestConditionAndResultProperties:
         logs = apply_interpretation_report(exp, report)
 
         # 既存の値 (999) が上書きされず、候補は追加もされない (1件のまま)
-        assert len(exp.condition_properties) == 1
-        assert exp.condition_properties[0].value == 999
+        assert len(exp.conditions) == 1
+        assert len(exp.conditions[0].properties) == 1
+        assert exp.conditions[0].properties[0].value == 999
         assert any("スキップ" in line for line in logs)
 
     def test_custom_ns_prefix(self):
@@ -112,15 +130,15 @@ class TestConditionAndResultProperties:
 
         apply_interpretation_report(exp, report, ns_prefix="mylab")
 
-        assert exp.condition_properties[0].key == "mylab:accelerating_voltage"
+        assert exp.conditions[0].properties[0].key == "mylab:accelerating_voltage"
 
 
 class TestMultipleStepsWithSameSemanticType:
-    """コードレビュー (2026-09-17) 4.1の指摘対応: 異なるStep由来の同じ
-    semantic_typeの値が、後勝ち上書きでもスキップでもなく、両方
-    ExperimentDataへ保持されること。"""
+    """データモデル対称化改修後: 異なるStep由来の同じsemantic_typeの値は、
+    別々のConditionDataオブジェクトとして独立して保持される (別オブジェクトの
+    ため、そもそもキー衝突が起こらない)。"""
 
-    def test_different_step_contexts_are_both_reflected(self):
+    def test_different_step_contexts_create_separate_conditions(self):
         exp = _make_experiment()
         candidate_step1 = _accepted_candidate(
             semantic_type="temperature", value=40, unit="degC",
@@ -134,29 +152,33 @@ class TestMultipleStepsWithSameSemanticType:
 
         logs = apply_interpretation_report(exp, report)
 
-        assert len(exp.condition_properties) == 2
-        by_key = {p.key: p for p in exp.condition_properties}
-        assert by_key["ns1:temperature__step_1"].value == 40
-        assert by_key["ns1:temperature__step_2"].value == 80
+        assert len(exp.conditions) == 2
+        by_key = {c.key: c for c in exp.conditions}
+        assert by_key["condition:step:1"].step_id == 1
+        assert by_key["condition:step:1"].properties[0].value == 40
+        assert by_key["condition:step:2"].step_id == 2
+        assert by_key["condition:step:2"].properties[0].value == 80
+        # 別オブジェクトなのでキー自体にはStepのサフィックスは要らない
+        assert by_key["condition:step:1"].properties[0].key == "ns1:temperature"
+        assert by_key["condition:step:2"].properties[0].key == "ns1:temperature"
         # どちらも「スキップ」ではなく「反映」ログになっていること。
         assert sum("反映" in line for line in logs) == 2
         assert not any("スキップ" in line for line in logs)
 
-    def test_experiment_context_key_format_is_unchanged(self):
-        """既定の実験全体context (`EXPERIMENT_CONTEXT`) では、従来通り
-        semantic_typeのみのkeyになる (後方互換性の維持)。"""
+    def test_experiment_context_uses_default_condition_object(self):
         exp = _make_experiment()
         candidate = _accepted_candidate(context="experiment")
         report = InterpretationReport(accepted=[candidate])
 
         apply_interpretation_report(exp, report)
 
-        assert exp.condition_properties[0].key == "ns1:accelerating_voltage"
+        assert len(exp.conditions) == 1
+        assert exp.conditions[0].key == "condition:experiment:1"
+        assert exp.conditions[0].properties[0].key == "ns1:accelerating_voltage"
 
     def test_same_step_context_still_dedupes(self):
-        """同じStep (同じcontext) の同じsemantic_typeが2回反映されようとした
-        場合は、これまで通り重複としてスキップされる (Step単位の一意性は
-        壊さない)。"""
+        """同じStep (同じcontext -> 同じオブジェクト) の同じsemantic_typeが2回
+        反映されようとした場合は、これまで通り重複としてスキップされる。"""
         exp = _make_experiment()
         candidate_a = _accepted_candidate(
             semantic_type="temperature", value=40, unit="degC",
@@ -170,8 +192,9 @@ class TestMultipleStepsWithSameSemanticType:
 
         logs = apply_interpretation_report(exp, report)
 
-        assert len(exp.condition_properties) == 1
-        assert exp.condition_properties[0].value == 40
+        assert len(exp.conditions) == 1
+        assert len(exp.conditions[0].properties) == 1
+        assert exp.conditions[0].properties[0].value == 40
         assert any("スキップ" in line for line in logs)
 
 
@@ -188,15 +211,17 @@ class TestMaterialsTarget:
 
         assert len(exp.materials) == 1
         synthetic = exp.materials[0]
+        assert synthetic.key == "material:experiment:1"
         assert synthetic.elab_id == 0
         assert len(synthetic.properties) == 1
         assert synthetic.properties[0].key == "ns1:sample_id"
 
     def test_reuses_existing_synthetic_material_elab_id_zero(self):
         """既存の`elabftw_client.py`のグループ名ベースの振り分けが、既に
-        elab_id=0の合成LinkedItemを作っている場合、それを再利用して
-        2つに分裂させないことを確認する。"""
-        existing = LinkedItem(
+        同じkey ("material:experiment:<id>") のMaterialDataを作っている場合、
+        それを再利用して2つに分裂させないことを確認する。"""
+        existing = MaterialData(
+            key="material:experiment:1",
             elab_id=0, title="テスト実験", category="(experiment own MATERIAL fields)",
             properties=[PropertyValue(key="ns1:Grid", xsi_type="stringType", value="Square")],
         )
@@ -213,7 +238,8 @@ class TestMaterialsTarget:
         assert len(exp.materials[0].properties) == 2
 
     def test_duplicate_material_property_is_skipped(self):
-        existing = LinkedItem(
+        existing = MaterialData(
+            key="material:experiment:1",
             elab_id=0, title="テスト実験", category="(interpretation-derived material)",
             properties=[PropertyValue(key="ns1:sample_id", xsi_type="stringType", value="S-001")],
         )
@@ -229,6 +255,25 @@ class TestMaterialsTarget:
         assert len(exp.materials[0].properties) == 1
         assert exp.materials[0].properties[0].value == "S-001"
         assert any("スキップ" in line for line in logs)
+
+    def test_step_scoped_material_creates_separate_object(self):
+        """target="materials"でもcontextが"step:<id>"なら、実験全体向けの
+        オブジェクトとは別のMaterialDataとして保持される (elab_id=Noneのまま。
+        実体を持たないため)。"""
+        exp = _make_experiment()
+        candidate = _accepted_candidate(
+            semantic_type="sample_id", value="S-001", unit=None,
+            role="material", target="materials", context=step_context(3),
+        )
+        report = InterpretationReport(accepted=[candidate])
+
+        apply_interpretation_report(exp, report)
+
+        assert len(exp.materials) == 1
+        material = exp.materials[0]
+        assert material.key == "material:step:3"
+        assert material.step_id == 3
+        assert material.elab_id is None
 
 
 class TestInstrumentTarget:
@@ -268,9 +313,21 @@ class TestUnsupportedTarget:
 
         logs = apply_interpretation_report(exp, report)
 
-        assert exp.condition_properties == []
-        assert exp.result_properties == []
+        assert exp.conditions == []
+        assert exp.results == []
         assert exp.materials == []
+        assert any("未対応" in line for line in logs)
+
+    def test_old_target_names_are_no_longer_supported(self):
+        """データモデル対称化改修により、旧target名 (condition_properties/
+        result_properties) はaliasとしても受け付けない (README参照)。"""
+        exp = _make_experiment()
+        candidate = _accepted_candidate(target="condition_properties")
+        report = InterpretationReport(accepted=[candidate])
+
+        logs = apply_interpretation_report(exp, report)
+
+        assert exp.conditions == []
         assert any("未対応" in line for line in logs)
 
 
@@ -290,7 +347,7 @@ class TestOnlyAcceptedIsApplied:
 
         apply_interpretation_report(exp, report)
 
-        assert exp.condition_properties == []
+        assert exp.conditions == []
 
     def test_unclassified_is_never_written(self):
         exp = _make_experiment()
@@ -303,7 +360,7 @@ class TestOnlyAcceptedIsApplied:
 
         apply_interpretation_report(exp, report)
 
-        assert exp.condition_properties == []
+        assert exp.conditions == []
 
     def test_empty_report_is_a_noop(self):
         exp = _make_experiment()
@@ -312,7 +369,7 @@ class TestOnlyAcceptedIsApplied:
         logs = apply_interpretation_report(exp, report)
 
         assert logs == []
-        assert exp.condition_properties == []
-        assert exp.result_properties == []
+        assert exp.conditions == []
+        assert exp.results == []
         assert exp.materials == []
         assert exp.instruments == []

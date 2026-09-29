@@ -198,13 +198,32 @@ python elabftw_to_maiml.py --experiment-id 123 --output out.maiml \
 
 | `target` | 反映先 | 備考 |
 | --- | --- | --- |
-| `condition_properties` | `ExperimentData.condition_properties` | そのまま追加 |
-| `result_properties` | `ExperimentData.result_properties` | そのまま追加 |
-| `materials` | `ExperimentData.materials` | `elab_id=0`の合成`LinkedItem`にまとめる (既存の「MATERIALグループの自己カスタムフィールド」と同じ規約を再利用し、二重に分裂させない) |
-| `instrument` | `ExperimentData.instruments` | 値を表示名とする`Party`を追加 (同名は重複追加しない) |
+| `conditions` | `ExperimentData.conditions` (`list[ConditionData]`) | `candidate.context`から特定した`ConditionData`の`properties`に追加 |
+| `results` | `ExperimentData.results` (`list[ResultData]`) | 同上 (`ResultData`の`properties`に追加) |
+| `materials` | `ExperimentData.materials` (`list[MaterialData]`) | 同上 (`MaterialData`の`properties`に追加)。`context`が実験全体 (既定) の場合は`elab_id=0`の合成`MaterialData`にまとめる (既存の「MATERIALグループの自己カスタムフィールド」と同じkey規約を再利用し、二重に分裂させない) |
+| `instrument` | `ExperimentData.instruments` (`list[Party]`) | 値を表示名とする`Party`を追加 (同名は重複追加しない) |
 
-既に同じキー (semantic_typeから生成) の値が存在する場合は、**上書きせずスキップ**
-します (development planの「一方で他方を上書きしない」という既存方針を、
+`materials`/`conditions`/`results`の3つは、データモデル対称化改修
+(elabftw2MaiML_model_refactoring_plan.md) により、いずれも「オブジェクト
+(`MaterialData`/`ConditionData`/`ResultData`) + `properties`」という共通構造で
+扱われる。反映先のオブジェクトは`candidate.context`から決まる:
+`context`が`"experiment"` (既定) なら実験全体を表す1つのオブジェクトに、
+`context`が`"step:<id>"` (`interpretation.pipeline.step_context()`が返す形式)
+ならそのStep専用のオブジェクトに、それぞれ集約される
+(`interpretation/apply.py`の`_find_or_create_container()`参照)。
+
+**旧バージョン (v0.3.x以前) との違い**: 旧target名`condition_properties`/
+`result_properties`は、対応表の書式としては**もう使えない** (aliasとしても
+受け付けない。指定すると上の「対応していないtarget」と同じ扱いになり、
+反映されずログに警告が出る)。既存の`--field-mapping`用YAMLを使っている場合は、
+`target: condition_properties` → `target: conditions`、
+`target: result_properties` → `target: results` に書き換えること
+(`elabftw2maiml/interpretation/field_mappings/`配下の同梱の対応表は
+書き換え済み)。
+
+既に同じキー (semantic_typeから生成) の値が、反映先オブジェクトの
+`properties`の中に既に存在する場合は、**上書きせずスキップ**します
+(development planの「一方で他方を上書きしない」という既存方針を、
 ExperimentDataへの反映段階でも維持しています)。
 
 **構造化フィールドの単位正規化**: eLabFTWのExtra Fieldsは値と単位を別々に持つ
@@ -324,13 +343,14 @@ python -m pytest tests/
   カスタムフィールドのグループ名 (`extra_fields_groups`) が`RawField.group`に
   正しく渡ること、グループ無しのフィールドは`group=None`になることを検証する。
 - `tests/test_apply.py`: `interpretation/apply.py`の
-  `apply_interpretation_report()` (Phase5-3: `InterpretationReport`の
+  `apply_interpretation_report()` (`InterpretationReport`の
   `accepted`候補をExperimentDataへ反映する) の単体テスト。`target`ごとの
-  反映先 (condition_properties/result_properties/materials/instrument) が
-  正しいこと、既存の値を上書きせずスキップすること、`conflicts`/
-  `unclassified`は絶対に反映されないこと、`materials`への反映が既存の
-  `elabftw_client.py`の`elab_id=0`合成アイテムの規約と衝突せず1つに
-  まとまることを検証する。
+  反映先 (conditions/results/materials/instrument) が正しいこと、既存の値を
+  上書きせずスキップすること、`conflicts`/`unclassified`は絶対に反映されない
+  こと、`materials`への反映が既存の`elabftw_client.py`の`elab_id=0`合成
+  オブジェクトの規約と衝突せず1つにまとまること、異なるStep (`context`) の
+  候補が別々のConditionData/MaterialDataオブジェクトとして保持されることを
+  検証する。
 - `tests/test_phase5_3_end_to_end.py`: 構造化フィールド (Custom Field) と
   自由記述 (実験本文) が一部で食い違うという、より実際に近いシナリオを使った
   統合テスト。「値が食い違う項目は自動反映されない」「値が一致する項目は
@@ -488,6 +508,7 @@ python elabftw_to_maiml.py --experiment-id 123 --output out.maiml \
 
 ## 既知の制約・今後の拡張ポイント
 
+- **中間データモデルは複数Condition・Step単位Resultに対応済み**です (`ExperimentData.conditions: list[ConditionData]` は複数保持でき、`ResultData.step_id`によりResultをStepごとの`resultTemplate`/`result`へ正しく振り分けます)。一方で、**Step単位ConditionとPNMLのtransition/placeとの対応付けは今回のスコープ外**です: `ConditionData.step_id`は現時点ではメタデータとして保持されるのみで、`builder.py`は全てのConditionTemplateを常に最初のSTEPが消費する共有place (`p_condition_in`) へ接続します (Materialも同様に共有place経由です)。Step単位でConditionを別々のPNML経路へ分離したい場合は、`builder.py`の`_build_protocol`/`_build_data`の拡張が必要です (`tests/test_structural_regression_multistep.py`が現状の挙動を回帰テストとして固定しています)。
 - **`metadata`フィールドの型ゆれに対応済み**: eLabFTWのAPIは実験・アイテムの`metadata`を
   JSON文字列のまま返しますが、`elabapi_python`の自動デシリアライズ処理はこの値が
   dict/listでない場合に内容を破棄し、空のオブジェクトを作ります。

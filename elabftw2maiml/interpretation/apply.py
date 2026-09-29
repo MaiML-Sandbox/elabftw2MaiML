@@ -1,6 +1,12 @@
 """
-Phase 5-3: `InterpretationReport` の `accepted` 候補を、実際に `ExperimentData` へ
-反映する (elabftw2MaiML_phase5_design.md のPhase 5-3に対応)。
+`InterpretationReport` の `accepted` 候補を、実際に `ExperimentData` へ反映する。
+
+データモデル対称化改修 (elabftw2MaiML_model_refactoring_plan.md) 以降、
+materials/conditions/results はいずれも「MaterialData/ConditionData/ResultData
+(オブジェクト) + properties」という共通構造で扱う。そのため、旧バージョンで
+存在した「materialだけはLinkedItemという特殊なオブジェクトなので反映処理も
+特殊」という非対称性は解消され、materials/conditions/resultsの3つは全く同じ
+フローで処理される (`_find_or_create_container()` + properties への追加)。
 
 設計上の方針:
 
@@ -16,27 +22,46 @@ Phase 5-3: `InterpretationReport` の `accepted` 候補を、実際に `Experime
    「実際に反映した/重複のためスキップした」という反映ログ (`List[str]`) のみを
    返す。
 
-2. **既存の値を上書きしない。** 同じキー (semantic_typeから生成するQName) が
-   既に対象のリストに存在する場合は追加をスキップし、ログに残す
-   (development plan 9節「一方で他方を上書きしない」という既存方針を、
+2. **既存の値を上書きしない。** 同じオブジェクトの `properties` に、同じキー
+   (semantic_typeから生成するQName) が既に存在する場合は追加をスキップし、ログに
+   残す (development plan 9節「一方で他方を上書きしない」という既存方針を、
    ExperimentDataへの反映段階でも維持するため)。
 
-3. **`InterpretationCandidate.target` で反映先を決める。**
-   - `"condition_properties"` / `"result_properties"`:
-     `ExperimentData` の同名属性 (`list[PropertyValue]`) に直接追加する。
-   - `"materials"`:
-     `ExperimentData.materials` (`list[LinkedItem]`) は本来「試料そのもの」
-     ではなく「試料的なリンクアイテム」の集合なので、単純な`PropertyValue`の
-     追加先が無い。既存の `elabftw_client.py`
-     (`_split_extra_fields_by_group`/`fetch_experiment`) が
-     「実験自身のMATERIALグループのカスタムフィールド」を`elab_id=0`の合成
-     `LinkedItem`にまとめている挙動に合わせ、`elab_id=0`の`LinkedItem`が既に
-     存在すればそれに追加し、無ければ新規に作成する。
-   - `"instrument"`:
-     `ExperimentData.instruments` (`list[Party]`) に、値を表示名とする
-     `Party`を追加する (名前の重複はスキップする)。
-   - その他の (未対応の) target値は、反映方法が未定義のためスキップし、
-     ログにその旨を残す (黙って捨てない)。
+3. **`InterpretationCandidate.target` で反映先を決める。** 実際にExperimentDataへ
+   反映できる`target`は次の4種類のみ:
+
+     - `"materials"`  -> `ExperimentData.materials`  (`list[MaterialData]`)
+     - `"conditions"` -> `ExperimentData.conditions` (`list[ConditionData]`)
+     - `"results"`    -> `ExperimentData.results`    (`list[ResultData]`)
+     - `"instrument"` -> `ExperimentData.instruments` (`list[Party]`。値を表示名と
+       する`Party`を追加する。名前の重複はスキップする)
+
+   それ以外の (未対応の) target値は、反映方法が未定義のためスキップし、
+   ログにその旨を残す (黙って捨てない)。
+
+   materials/conditions/resultsの3つは、`candidate.context` から対象オブジェクトを
+   特定する (`_container_key()`):
+
+     - contextが `None` または `"experiment"` (`interpretation.pipeline.
+       EXPERIMENT_CONTEXT`) の場合: key = `f"{singular}:experiment:{experiment.
+       elab_id}"`。実験全体を表す既定のオブジェクトを指す。`elabftw_client.py` が
+       実験自身のカスタムフィールドから生成するMaterialData/ConditionData/
+       ResultDataも同じkey規約を使うため、`--field-mapping`側の候補と自然に
+       マージされ、二重にオブジェクトが分裂しない (旧: materialsだけ`elab_id=0`の
+       合成LinkedItemという特殊規約に依存していた)。
+     - contextが `"step:<id>"` (`interpretation.pipeline.step_context()`が返す形式)
+       の場合: key = `f"{singular}:step:<id>"`。指定したStepに対応する専用の
+       オブジェクトを取得・生成する (無ければ新規作成し、`step_id`にもその値を
+       設定する)。
+     - それ以外の任意のcontext文字列 (例: SEM/TEM対応表の`"sem_acquisition"`) も
+       同様にkeyへそのまま使う。
+
+   該当するkeyのオブジェクトが対象リストに既に無ければ新規作成し、あれば再利用する
+   (properties追加先はそのオブジェクトの`properties`)。
+
+   プロパティキー自体はcontextを含めない (旧: Step単位で`__step_n`サフィックスを
+   付与していたが、対称化後はStep単位で別々のオブジェクトに分かれるため、
+   オブジェクトを跨いだキー衝突が起こらず、サフィックスが不要になった)。
 
 4. この関数は`experiment`を**破壊的に変更する** (list系属性へのappend)。
    呼び出し側で変更前の状態を保持したい場合は、あらかじめ
@@ -48,18 +73,19 @@ import re
 from decimal import Decimal
 from typing import List, Optional
 
-from ..model import ExperimentData, LinkedItem, Party, PropertyValue
+from ..model import ConditionData, ExperimentData, MaterialData, Party, PropertyValue, ResultData
 from .conflict import InterpretationCandidate
 from .pipeline import EXPERIMENT_CONTEXT, InterpretationReport
 
-# 実験自身のMATERIALグループの自己フィールドを合成LinkedItemにまとめる際、
+# 実験自身のMATERIALグループの自己フィールドを合成MaterialDataにまとめる際、
 # elabftw_client.py の fetch_experiment() が使っている規約 (elab_id=0) に合わせる。
-# これにより、旧来のグループ名ベースの振り分けとPhase 5の対応表ベースの振り分けが
-# 両方有効な場合でも、材料が2つの別々の合成アイテムに分裂しない。
 _SYNTHETIC_MATERIAL_ELAB_ID = 0
 _SYNTHETIC_MATERIAL_CATEGORY = "(interpretation-derived material)"
 
-_SUPPORTED_PROPERTY_TARGETS = ("condition_properties", "result_properties")
+# target値 (複数形) -> ExperimentData属性名 / コンテナのkeyに使う単数形 / dataclass。
+_TARGET_ATTR = {"materials": "materials", "conditions": "conditions", "results": "results"}
+_TARGET_SINGULAR = {"materials": "material", "conditions": "condition", "results": "result"}
+_CONTAINER_FACTORY = {"materials": MaterialData, "conditions": ConditionData, "results": ResultData}
 
 
 def _sanitize_ncname(name: str) -> str:
@@ -89,23 +115,15 @@ def _infer_xsi_type(value) -> str:
 
 
 def _candidate_key(candidate: InterpretationCandidate, ns_prefix: str) -> str:
-    """`InterpretationCandidate` を `ExperimentData`/MaiML上の一意なproperty keyに
+    """`InterpretationCandidate` を、対象オブジェクト内で一意な property keyに
     変換する。
 
-    コードレビュー (2026-09-17) 4.1の指摘対応: 以前はsemantic_typeのみでkeyを
-    生成しており、異なるcontext (例: `step:1`と`step:2`) の同じsemantic_typeが
-    同じkeyになって、2件目が「既存キー」として黙ってスキップされる問題があった
-    (複数StepでStepごとに同じ意味種別の値を記録するケースでデータが欠落する)。
-
-    実験全体を表す既定のcontext (`EXPERIMENT_CONTEXT`。多くの対応表がこれを
-    使っている) では、これまで通り`semantic_type`のみのkeyを維持し、既存の
-    MaiML出力・テストとの後方互換性を保つ。それ以外のcontext (Step単位の
-    `step:<id>`や、SEM/TEM対応表の`sem_acquisition`等) の場合のみ、contextを
-    keyへ含めて衝突を避ける。"""
-    base = _sanitize_ncname(candidate.semantic_type)
-    if candidate.context and candidate.context != EXPERIMENT_CONTEXT:
-        return f"{ns_prefix}:{base}__{_sanitize_ncname(candidate.context)}"
-    return f"{ns_prefix}:{base}"
+    対称化改修より前は、実験全体を表す既定context以外 (Step単位の`step:<id>`等)
+    の場合にcontextをkeyへ含めていた (異なるStep由来の同じsemantic_typeが、単一の
+    フラットなリストに混在していたため)。対称化後はcontextごとに別々の
+    MaterialData/ConditionData/ResultDataオブジェクトへ分かれるため、
+    オブジェクトを跨いだキー衝突は起こらず、常にsemantic_typeのみのkeyでよい。"""
+    return f"{ns_prefix}:{_sanitize_ncname(candidate.semantic_type)}"
 
 
 def _candidate_to_property(candidate: InterpretationCandidate, ns_prefix: str) -> PropertyValue:
@@ -122,11 +140,51 @@ def _candidate_to_property(candidate: InterpretationCandidate, ns_prefix: str) -
     )
 
 
-def _find_synthetic_material(experiment: ExperimentData) -> Optional[LinkedItem]:
-    for item in experiment.materials:
-        if item.elab_id == _SYNTHETIC_MATERIAL_ELAB_ID:
-            return item
-    return None
+def _parse_step_id(context: Optional[str]) -> Optional[int]:
+    """`"step:<id>"` 形式のcontextからStepの`elab_id`を取り出す。それ以外の
+    (またはNoneの) contextなら None を返す。"""
+    if not context or not context.startswith("step:"):
+        return None
+    suffix = context[len("step:"):]
+    try:
+        return int(suffix)
+    except ValueError:
+        return None
+
+
+def _container_key(target: str, context: Optional[str], experiment_elab_id) -> str:
+    singular = _TARGET_SINGULAR[target]
+    if context and context != EXPERIMENT_CONTEXT:
+        return f"{singular}:{context}"
+    return f"{singular}:experiment:{experiment_elab_id}"
+
+
+def _find_or_create_container(experiment: ExperimentData, target: str, context: Optional[str]):
+    """`target`/`context`から、反映先のMaterialData/ConditionData/ResultDataを
+    取得する。無ければ新規作成して`experiment`の対応するリストに追加する。"""
+    attr = _TARGET_ATTR[target]
+    key = _container_key(target, context, experiment.elab_id)
+    container_list = getattr(experiment, attr)
+    for container in container_list:
+        if container.key == key:
+            return container
+
+    step_id = _parse_step_id(context)
+    factory = _CONTAINER_FACTORY[target]
+    is_experiment_context = context is None or context == EXPERIMENT_CONTEXT
+    if target == "materials":
+        container = factory(
+            key=key,
+            title=experiment.title if is_experiment_context
+                  else f"(interpretation-derived material: {context})",
+            elab_id=_SYNTHETIC_MATERIAL_ELAB_ID if is_experiment_context else None,
+            category=_SYNTHETIC_MATERIAL_CATEGORY,
+            step_id=step_id,
+        )
+    else:
+        container = factory(key=key, step_id=step_id)
+    container_list.append(container)
+    return container
 
 
 def apply_interpretation_report(
@@ -143,52 +201,26 @@ def apply_interpretation_report(
     `interpretation.pipeline.format_interpretation_report(report)` 等を使うこと。
     """
     logs: List[str] = []
-
-    existing_property_keys = {
-        target: {p.key for p in getattr(experiment, target)}
-        for target in _SUPPORTED_PROPERTY_TARGETS
-    }
-    synthetic_material = _find_synthetic_material(experiment)
     instrument_names = {p.name for p in experiment.instruments}
 
     for candidate in report.accepted:
         target = candidate.target
-        key = _candidate_key(candidate, ns_prefix)
         unit_label = f" {candidate.unit}" if candidate.unit else ""
 
-        if target in _SUPPORTED_PROPERTY_TARGETS:
-            if key in existing_property_keys[target]:
+        if target in _TARGET_ATTR:
+            prop_key = _candidate_key(candidate, ns_prefix)
+            container = _find_or_create_container(experiment, target, candidate.context)
+            if any(p.key == prop_key for p in container.properties):
                 logs.append(
-                    f"[スキップ] {key} は既に{target}に存在するため追加しませんでした "
-                    f"(semantic_type={candidate.semantic_type})。"
+                    f"[スキップ] {prop_key} は既に{target} (key={container.key}) に"
+                    f"存在するため追加しませんでした (semantic_type={candidate.semantic_type})。"
                 )
                 continue
-            getattr(experiment, target).append(_candidate_to_property(candidate, ns_prefix))
-            existing_property_keys[target].add(key)
+            container.properties.append(_candidate_to_property(candidate, ns_prefix))
             logs.append(
-                f"[反映] {target} に {key} = {candidate.value}{unit_label} を追加しました "
+                f"[反映] {target} (key={container.key}) に {prop_key} = "
+                f"{candidate.value}{unit_label} を追加しました "
                 f"(source={candidate.source}, confidence={candidate.confidence:.2f})。"
-            )
-
-        elif target == "materials":
-            if synthetic_material is None:
-                synthetic_material = LinkedItem(
-                    elab_id=_SYNTHETIC_MATERIAL_ELAB_ID,
-                    title=experiment.title,
-                    category=_SYNTHETIC_MATERIAL_CATEGORY,
-                    properties=[],
-                )
-                experiment.materials.append(synthetic_material)
-            if any(p.key == key for p in synthetic_material.properties):
-                logs.append(
-                    f"[スキップ] {key} は既にmaterials (合成アイテム) に存在するため"
-                    f"追加しませんでした。"
-                )
-                continue
-            synthetic_material.properties.append(_candidate_to_property(candidate, ns_prefix))
-            logs.append(
-                f"[反映] materials (合成アイテム) に {key} = {candidate.value}{unit_label} を"
-                f"追加しました (source={candidate.source}, confidence={candidate.confidence:.2f})。"
             )
 
         elif target == "instrument":

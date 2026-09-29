@@ -59,7 +59,7 @@
           <description>FT-IR測定</description>
           <transitionRef id="tref_t_step_502" ref="t_step_502"/>
         </instruction>
-        <materialTemplate id="mattmpl_88">
+        <materialTemplate id="mattmpl_material_item_88">
           <uuid>00000000-0000-4000-8000-000000000005</uuid>
           <description>PMMAサンプル</description>
           <property key="ns1:SampleID" xsi:type="stringType">
@@ -68,17 +68,17 @@
           <property key="ns1:Thickness" xsi:type="doubleType">
             <value>0.125</value>
           </property>
-          <placeRef id="pref_mat_88" ref="p_material_in"/>
+          <placeRef id="pref_mat_material_item_88" ref="p_material_in"/>
         </materialTemplate>
-        <materialTemplate id="mattmpl_0">
+        <materialTemplate id="mattmpl_material_experiment_123">
           <uuid>00000000-0000-4000-8000-000000000006</uuid>
           <description>PMMA薄膜のFT-IR測定</description>
           <property key="ns1:SampleNote" xsi:type="stringType">
             <value>室温保管</value>
           </property>
-          <placeRef id="pref_mat_0" ref="p_material_in"/>
+          <placeRef id="pref_mat_material_experiment_123" ref="p_material_in"/>
         </materialTemplate>
-        <conditionTemplate id="condtmpl_exp123">
+        <conditionTemplate id="condtmpl_condition_experiment_123">
           <uuid>00000000-0000-4000-8000-000000000007</uuid>
           <property key="ns1:Resolution" xsi:type="doubleType">
             <value>4.00</value>
@@ -89,7 +89,7 @@
           <property key="ns1:Humidity" xsi:type="doubleType">
             <value>45</value>
           </property>
-          <placeRef id="pref_cond" ref="p_condition_in"/>
+          <placeRef id="pref_cond_condition_experiment_123" ref="p_condition_in"/>
         </conditionTemplate>
         <resultTemplate id="restmpl_step_501">
           <uuid>00000000-0000-4000-8000-000000000008</uuid>
@@ -119,7 +119,7 @@
     <uuid>00000000-0000-4000-8000-000000000019</uuid>
     <results id="results_exp123">
       <uuid>00000000-0000-4000-8000-000000000018</uuid>
-      <material id="material_88" ref="mattmpl_88">
+      <material id="material_material_item_88" ref="mattmpl_material_item_88">
         <uuid>00000000-0000-4000-8000-000000000013</uuid>
         <description>PMMAサンプル</description>
         <property key="ns1:SampleID" xsi:type="stringType">
@@ -129,14 +129,14 @@
           <value>0.125</value>
         </property>
       </material>
-      <material id="material_0" ref="mattmpl_0">
+      <material id="material_material_experiment_123" ref="mattmpl_material_experiment_123">
         <uuid>00000000-0000-4000-8000-000000000014</uuid>
         <description>PMMA薄膜のFT-IR測定</description>
         <property key="ns1:SampleNote" xsi:type="stringType">
           <value>室温保管</value>
         </property>
       </material>
-      <condition id="condition_exp123" ref="condtmpl_exp123">
+      <condition id="condition_condition_experiment_123" ref="condtmpl_condition_experiment_123">
         <uuid>00000000-0000-4000-8000-000000000015</uuid>
         <property key="ns1:Resolution" xsi:type="doubleType">
           <value>4.00</value>

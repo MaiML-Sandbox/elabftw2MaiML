@@ -40,14 +40,14 @@
           <description>秤量</description>
           <transitionRef id="tref_t_step_701" ref="t_step_701"/>
         </instruction>
-        <materialTemplate id="mattmpl_0">
+        <materialTemplate id="mattmpl_material_default">
           <uuid>00000000-0000-4000-8000-000000000004</uuid>
           <description>(no linked item)</description>
-          <placeRef id="pref_mat_0" ref="p_material_in"/>
+          <placeRef id="pref_mat_material_default" ref="p_material_in"/>
         </materialTemplate>
-        <conditionTemplate id="condtmpl_exp200">
+        <conditionTemplate id="condtmpl_condition_experiment_200">
           <uuid>00000000-0000-4000-8000-000000000005</uuid>
-          <placeRef id="pref_cond" ref="p_condition_in"/>
+          <placeRef id="pref_cond_condition_experiment_200" ref="p_condition_in"/>
         </conditionTemplate>
         <resultTemplate id="restmpl_step_701">
           <uuid>00000000-0000-4000-8000-000000000006</uuid>
@@ -60,11 +60,11 @@
     <uuid>00000000-0000-4000-8000-000000000014</uuid>
     <results id="results_exp200">
       <uuid>00000000-0000-4000-8000-000000000013</uuid>
-      <material id="material_0" ref="mattmpl_0">
+      <material id="material_material_default" ref="mattmpl_material_default">
         <uuid>00000000-0000-4000-8000-000000000010</uuid>
         <description>(no linked item)</description>
       </material>
-      <condition id="condition_exp200" ref="condtmpl_exp200">
+      <condition id="condition_condition_experiment_200" ref="condtmpl_condition_experiment_200">
         <uuid>00000000-0000-4000-8000-000000000011</uuid>
       </condition>
       <result id="result_step_701" ref="restmpl_step_701">

@@ -1,8 +1,7 @@
 """
-Phase 5-3 (interpretation -> ExperimentDataへの反映 -> MaiML生成) の
-統合テスト。elabftw2MaiML_phase5_design.mdのPhase 5-3の6項目のうち、
-実際のeLabFTWサーバーを必要としない部分 (1〜5) を、合成データで一通り確認する
-(実データでの確認はPhase 5-4で別途行う)。
+interpretation -> ExperimentDataへの反映 -> MaiML生成 の統合テスト。
+データモデル対称化改修 (elabftw2MaiML_model_refactoring_plan.md) 後の
+target名 (materials/conditions/results/instrument) を使う。
 
 シナリオ:
     - 実験のカスタムフィールド (構造化): AcceleratingVoltage(kV)=200,
@@ -16,7 +15,7 @@ Phase 5-3 (interpretation -> ExperimentDataへの反映 -> MaiML生成) の
           role/targetが未確定のままのため unclassified に残る (念のための
           突き合わせ用の重複として残るだけで、二重に書き込まれることはない)。
         - 試料ID: 自由記述からの言及は無く、構造化フィールドのみ -> 競合なしで
-          自動反映される (materials への合成アイテムとして)。
+          自動反映される (materials への合成オブジェクトとして)。
 """
 from datetime import datetime
 from decimal import Decimal
@@ -49,7 +48,7 @@ FIELD_MAPPING = FieldMapping.from_dict({
             "role": "condition",
             "unit": "kV",
             "context": "experiment",
-            "target": "condition_properties",
+            "target": "conditions",
             "required": True,
         },
         "Magnification": {
@@ -57,7 +56,7 @@ FIELD_MAPPING = FieldMapping.from_dict({
             "role": "condition",
             "unit": "x",
             "context": "experiment",
-            "target": "condition_properties",
+            "target": "conditions",
         },
         "sampleID": {
             "semantic_type": "sample_id",
@@ -92,7 +91,7 @@ def _build_experiment_and_report():
 
 class TestReportShapeBeforeApply:
     """反映前の`InterpretationReport`自体が、意図した仕分けになっていることを
-    確認する (elabftw2MaiML_phase5_design.md Phase5-3 項目1・3・4に対応)。"""
+    確認する。"""
 
     def test_accelerating_voltage_conflict_detected(self):
         _experiment, report = _build_experiment_and_report()
@@ -133,22 +132,23 @@ class TestReportShapeBeforeApply:
 
 class TestApplyThenBuild:
     """`apply_interpretation_report()`でExperimentDataへ反映し、
-    `MaimlBuilder`でMaiMLを生成できることを確認する
-    (elabftw2MaiML_phase5_design.md Phase5-3 項目2・5に対応)。"""
+    `MaimlBuilder`でMaiMLを生成できることを確認する。"""
 
     def test_conflicting_value_is_absent_from_experiment_data(self):
         experiment, report = _build_experiment_and_report()
         apply_interpretation_report(experiment, report)
 
-        keys = {p.key for p in experiment.condition_properties}
-        assert "ns1:accelerating_voltage" not in keys
+        assert experiment.conditions == [] or all(
+            p.key != "ns1:accelerating_voltage"
+            for c in experiment.conditions for p in c.properties
+        )
 
     def test_agreed_value_is_present_exactly_once(self):
         experiment, report = _build_experiment_and_report()
         apply_interpretation_report(experiment, report)
 
         magnification_props = [
-            p for p in experiment.condition_properties if p.key == "ns1:magnification"
+            p for c in experiment.conditions for p in c.properties if p.key == "ns1:magnification"
         ]
         assert len(magnification_props) == 1
         assert magnification_props[0].value == 200000
@@ -159,6 +159,7 @@ class TestApplyThenBuild:
 
         assert len(experiment.materials) == 1
         material = experiment.materials[0]
+        assert material.key == "material:experiment:42"
         assert material.elab_id == 0
         keys = {p.key for p in material.properties}
         assert "ns1:sample_id" in keys
@@ -187,7 +188,7 @@ class TestApplyThenBuild:
         assert "HS-100MG001" in xml_text  # 試料ID (競合の無い値) も反映されている
         # 競合した加速電圧の値 (200/250) は、どちらもproperty値としては書き込まれない。
         # (自由記述の原文 "250" 等は実験本文プロパティ内に残り得るため、単純な文字列
-        # 不在チェックではなく、condition_propertiesの中身で既に確認済み)
+        # 不在チェックではなく、conditionsの中身で既に確認済み)
 
     @pytest.mark.skipif(not SCHEMA_PATH.exists(), reason=(
         f"{SCHEMA_PATH} が見つからないため、XSDによるスキーマ検証をスキップします。"
@@ -207,11 +208,11 @@ class TestApplyThenBuild:
 
 
 class TestRealisticStringValuesWithEmbeddedUnits:
-    """Phase 5-3 fix (単位正規化): 実際のeLabFTWのExtra Fieldsは値と単位を分けて
-    持つ仕組みが無く、"200 kV"のように単位混在の文字列で返ってくることがある
-    (実際の画面例で確認済み)。正規化を行わない場合、これは自由記述側の数値
-    (int/型)と表現が食い違い、実際に一致している値が誤って競合と判定されて
-    しまっていた。この節では、その修正が効いていることを確認する。"""
+    """単位正規化: 実際のeLabFTWのExtra Fieldsは値と単位を分けて持つ仕組みが
+    無く、"200 kV"のように単位混在の文字列で返ってくることがある。正規化を
+    行わない場合、これは自由記述側の数値(int/型)と表現が食い違い、実際に
+    一致している値が誤って競合と判定されてしまっていた。この節では、その
+    修正が効いていることを確認する。"""
 
     def _build(self, accelerating_voltage_raw_value, body_text):
         experiment = ExperimentData(
@@ -246,7 +247,7 @@ class TestRealisticStringValuesWithEmbeddedUnits:
         assert accepted[0].value == Decimal("200")
 
         apply_interpretation_report(experiment, report)
-        keys = {p.key: p for p in experiment.condition_properties}
+        keys = {p.key: p for c in experiment.conditions for p in c.properties}
         assert "ns1:accelerating_voltage" in keys
         assert keys["ns1:accelerating_voltage"].value == Decimal("200")
         assert keys["ns1:accelerating_voltage"].units == "kV"
@@ -266,7 +267,7 @@ class TestRealisticStringValuesWithEmbeddedUnits:
         assert "accelerating_voltage" not in accepted_types
 
         apply_interpretation_report(experiment, report)
-        keys = {p.key for p in experiment.condition_properties}
+        keys = {p.key for c in experiment.conditions for p in c.properties}
         assert "ns1:accelerating_voltage" not in keys
 
     def test_dimension_mismatched_value_is_unclassified_not_falsely_matched_or_conflicted(self):
@@ -287,7 +288,7 @@ class TestRealisticStringValuesWithEmbeddedUnits:
         assert unclassified[0].reason is not None
 
         apply_interpretation_report(experiment, report)
-        assert experiment.condition_properties == []
+        assert experiment.conditions == []
 
     def test_non_numeric_value_is_unclassified_and_logged_not_dropped(self):
         """"not measured" のような非数値の値も、クラッシュせず未分類として
@@ -306,8 +307,8 @@ class TestRealisticStringValuesWithEmbeddedUnits:
 
 
 class TestMultipleStepsSameSemanticTypeEndToEnd:
-    """コードレビュー (2026-09-17) 4.1・8.1の指摘対応: 異なるStepの同じ
-    semantic_typeの構造化候補が、両方ExperimentDataへ反映され、生成された
+    """異なるStepの同じsemantic_typeの構造化候補が、それぞれ別々の
+    ConditionDataオブジェクトとしてExperimentDataへ反映され、生成された
     MaiMLにも両方出力されることを確認する統合テスト。"""
 
     STEP_FIELD_MAPPING = FieldMapping.from_dict({
@@ -316,7 +317,7 @@ class TestMultipleStepsSameSemanticTypeEndToEnd:
                 "semantic_type": "temperature",
                 "role": "condition",
                 "unit": "degC",
-                "target": "condition_properties",
+                "target": "conditions",
             },
         }
     })
@@ -345,14 +346,13 @@ class TestMultipleStepsSameSemanticTypeEndToEnd:
 
         apply_interpretation_report(experiment, report)
 
-        condition_keys = {p.key: p.value for p in experiment.condition_properties}
-        assert condition_keys == {
-            "ns1:temperature__step_1": Decimal("40"),
-            "ns1:temperature__step_2": Decimal("80"),
-        }
+        assert len(experiment.conditions) == 2
+        by_key = {c.key: c for c in experiment.conditions}
+        assert by_key["condition:step:1"].properties[0].value == Decimal("40")
+        assert by_key["condition:step:2"].properties[0].value == Decimal("80")
 
         builder = MaimlBuilder()
         xml_root = builder.build(experiment)
         xml_bytes = etree.tostring(xml_root)
-        assert b"ns1:temperature__step_1" in xml_bytes
-        assert b"ns1:temperature__step_2" in xml_bytes
+        assert b"condtmpl_condition_step_1" in xml_bytes
+        assert b"condtmpl_condition_step_2" in xml_bytes

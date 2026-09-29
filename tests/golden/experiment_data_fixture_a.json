@@ -50,9 +50,8 @@
   ],
   "materials": [
     {
-      "elab_id": 88,
+      "key": "material:item:88",
       "title": "PMMAサンプル",
-      "category": "Samples",
       "properties": [
         {
           "key": "ns1:SampleID",
@@ -74,12 +73,14 @@
           "units": null,
           "scale_factor": null
         }
-      ]
+      ],
+      "elab_id": 88,
+      "category": "Samples",
+      "step_id": null
     },
     {
-      "elab_id": 0,
+      "key": "material:experiment:123",
       "title": "PMMA薄膜のFT-IR測定",
-      "category": "(experiment own MATERIAL fields)",
       "properties": [
         {
           "key": "ns1:SampleNote",
@@ -91,89 +92,106 @@
           "units": null,
           "scale_factor": null
         }
+      ],
+      "elab_id": 0,
+      "category": "(experiment own MATERIAL fields)",
+      "step_id": null
+    }
+  ],
+  "conditions": [
+    {
+      "key": "condition:experiment:123",
+      "title": null,
+      "properties": [
+        {
+          "key": "ns1:Resolution",
+          "xsi_type": "doubleType",
+          "value": "4.00",
+          "values": null,
+          "description": null,
+          "format_string": null,
+          "units": null,
+          "scale_factor": null
+        },
+        {
+          "key": "ns1:Scans",
+          "xsi_type": "doubleType",
+          "value": "32",
+          "values": null,
+          "description": null,
+          "format_string": null,
+          "units": null,
+          "scale_factor": null
+        },
+        {
+          "key": "ns1:Humidity",
+          "xsi_type": "doubleType",
+          "value": "45",
+          "values": null,
+          "description": null,
+          "format_string": null,
+          "units": null,
+          "scale_factor": null
+        }
+      ],
+      "step_id": null
+    }
+  ],
+  "results": [
+    {
+      "key": "result:experiment:123",
+      "title": null,
+      "properties": [
+        {
+          "key": "ns1:experimentBody",
+          "xsi_type": "stringType",
+          "value": "PMMA薄膜サンプルのFT-IRスペクトルを測定した。",
+          "values": null,
+          "description": null,
+          "format_string": null,
+          "units": null,
+          "scale_factor": null
+        },
+        {
+          "key": "ns1:tags",
+          "xsi_type": "stringType",
+          "value": "FTIR,polymer",
+          "values": null,
+          "description": null,
+          "format_string": null,
+          "units": null,
+          "scale_factor": null
+        },
+        {
+          "key": "ns1:AnalysisSummary",
+          "xsi_type": "stringType",
+          "value": "良好な吸収ピークを確認",
+          "values": null,
+          "description": null,
+          "format_string": null,
+          "units": null,
+          "scale_factor": null
+        },
+        {
+          "key": "ns1:resultItem",
+          "xsi_type": "stringType",
+          "value": "分析結果まとめ",
+          "values": null,
+          "description": null,
+          "format_string": null,
+          "units": null,
+          "scale_factor": null
+        }
+      ],
+      "step_id": null,
+      "uploads": [
+        {
+          "filename": "spectrum.csv",
+          "uri": "https://elab.example.org/app/download.php?f=abc123_spectrum.csv&name=spectrum.csv",
+          "hash_b64": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+          "hash_method": "SHA256"
+        }
       ]
-    }
-  ],
-  "condition_properties": [
-    {
-      "key": "ns1:Resolution",
-      "xsi_type": "doubleType",
-      "value": "4.00",
-      "values": null,
-      "description": null,
-      "format_string": null,
-      "units": null,
-      "scale_factor": null
-    },
-    {
-      "key": "ns1:Scans",
-      "xsi_type": "doubleType",
-      "value": "32",
-      "values": null,
-      "description": null,
-      "format_string": null,
-      "units": null,
-      "scale_factor": null
-    },
-    {
-      "key": "ns1:Humidity",
-      "xsi_type": "doubleType",
-      "value": "45",
-      "values": null,
-      "description": null,
-      "format_string": null,
-      "units": null,
-      "scale_factor": null
-    }
-  ],
-  "result_properties": [
-    {
-      "key": "ns1:experimentBody",
-      "xsi_type": "stringType",
-      "value": "PMMA薄膜サンプルのFT-IRスペクトルを測定した。",
-      "values": null,
-      "description": null,
-      "format_string": null,
-      "units": null,
-      "scale_factor": null
-    },
-    {
-      "key": "ns1:tags",
-      "xsi_type": "stringType",
-      "value": "FTIR,polymer",
-      "values": null,
-      "description": null,
-      "format_string": null,
-      "units": null,
-      "scale_factor": null
-    },
-    {
-      "key": "ns1:AnalysisSummary",
-      "xsi_type": "stringType",
-      "value": "良好な吸収ピークを確認",
-      "values": null,
-      "description": null,
-      "format_string": null,
-      "units": null,
-      "scale_factor": null
-    },
-    {
-      "key": "ns1:resultItem",
-      "xsi_type": "stringType",
-      "value": "分析結果まとめ",
-      "values": null,
-      "description": null,
-      "format_string": null,
-      "units": null,
-      "scale_factor": null
-    }
-  ],
-  "uploads": [
-    {
-      "filename": "spectrum.csv",
-      "uri": "https://elab.example.org/app/download.php?f=abc123_spectrum.csv&name=spectrum.csv",
-      "hash_b64": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
-      "hash_method": "SHA256"
     }
   ],
   "elab_url": "https://elab.example.org/experiments.php?mode=view&id=123"
