@@ -6,6 +6,14 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- **Custom Field 由来の値にも `dimension` 単位換算を適用** (`candidate_from_field()`)。
+  自由記述と同じ `normalize_quantity()` で標準単位へ換算し、Custom Field `5000 V` と
+  自由記述 `5 kV` が同じ内部表現 (5 kV) になり conflict しない。次元不一致・未知の単位・
+  数値でない値は semantic_type と原値を保持して `unclassified`。`dimension` の無い対応表は
+  従来動作。`normalize.parse_numeric_and_unit()` (数値と単位の分離のみ) を追加し、
+  `sem_tem_v2.yaml` の `probe_current` に Custom Field 名 (プローブ電流 / Probe Current) を追加。
+- README を現行実装に同期 (単位換算・version 1/2 の説明・モジュール一覧・CLI 引数・
+  Section/Statement/Operation の説明・現時点の制約)。
 - **Section/Semantic Interpretation レビュー対応** (`elabftw2MaiML_section_semantic_review_fixes.md`)。
   - 共通 semantics (`field_mappings/common_semantics.yaml`: duration/temperature/repeat_count/
     rotation_speed/ph) と、対応表の `include:`。`sem_tem_v2.yaml` から取り込み、実YAMLでも

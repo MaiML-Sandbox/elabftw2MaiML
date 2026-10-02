@@ -432,3 +432,71 @@ def test_cli_new_options_require_section_mapping(monkeypatch, flag):
         "--api-key", "k", *flag])
     with pytest.raises(SystemExit):
         cli_module.main()
+
+
+# ---------------------------------------------------------------------------
+# Custom Field 由来の値にも dimension 換算を適用する (自由記述との対称化)
+# ---------------------------------------------------------------------------
+
+from elabftw2maiml.interpretation import RawField, candidate_from_field  # noqa: E402
+from elabftw2maiml.interpretation.normalize import parse_numeric_and_unit  # noqa: E402
+
+FM = LOADED.field_mapping
+
+
+def cf(name, value, unit=None):
+    return candidate_from_field(RawField(name=name, value=value, unit=unit), FM)
+
+
+class TestCustomFieldUnitConversion:
+    @pytest.mark.parametrize("name, value, unit, expected", [
+        ("加速電圧", "5000 V", None, (5, "kV")),
+        ("加速電圧", 5000, "V", (5, "kV")),
+        ("加速電圧", "5000V", None, (5, "kV")),
+        ("Particle Size", "1.2 µm", None, (1200, "nm")),
+        ("Camera Length", "1.5 m", None, (1500, "mm")),
+        ("Probe Current", "2 nA", None, (2000, "pA")),
+        ("加速電圧", 5, None, (5, "kV")),         # 単位無し: 標準単位とみなす
+        ("加速電圧", "5 kV", None, (5, "kV")),    # 換算不要
+    ])
+    def test_converted_to_canonical_unit(self, name, value, unit, expected):
+        c = cf(name, value, unit)
+        assert (c.value, c.unit) == expected
+        if name != "Particle Size":  # 粒径は result 側の定義
+            assert (c.role, c.target) == ("condition", "conditions")
+
+    def test_conversion_keeps_raw_value_and_reason(self):
+        c = cf("加速電圧", "5000 V")
+        assert c.raw_value == "5000 V" and "換算" in c.reason
+
+    @pytest.mark.parametrize("value, unit", [("2 mA", None), (200, "mA"), ("not measured", None), ("5 furlong", None)])
+    def test_dimension_mismatch_is_not_applied(self, value, unit):
+        c = cf("Accelerating Voltage", value, unit)
+        assert c.semantic_type == "accelerating_voltage"
+        assert (c.role, c.target) == (None, None)
+        assert c.raw_value == value and "次元不一致" in c.reason
+
+    def test_field_without_dimension_keeps_old_behaviour(self):
+        # dimension の無い対応表 (v1) は従来通り、期待単位との完全一致で判定する
+        from elabftw2maiml.interpretation import FieldMapping, FieldRule
+        fm = FieldMapping({"HV": FieldRule(
+            semantic_type="accelerating_voltage", role="condition",
+            target="conditions", unit="kV")})
+        ok = candidate_from_field(RawField(name="HV", value="200 kV"), fm)
+        ng = candidate_from_field(RawField(name="HV", value="5000 V"), fm)
+        assert ok.role == "condition" and ng.role is None
+
+    def test_parse_numeric_and_unit_does_not_judge_units(self):
+        n = parse_numeric_and_unit("5000 V")
+        assert (int(n.value), n.unit) == (5000, "V")
+        assert parse_numeric_and_unit("200").unit is None
+        assert parse_numeric_and_unit("not measured") is None
+        assert parse_numeric_and_unit(True) is None
+
+    def test_custom_field_and_free_text_agree_without_conflict(self):
+        structured = [cf("加速電圧", "5000 V")]
+        exp = ExperimentData(elab_id=1, title="t", date=None, body_text="観察\n加速電圧 5 kV で観察")
+        report = pipeline().interpret_experiment(exp, structured_candidates=structured)
+        assert report.conflicts == []
+        volts = [c for c in report.candidates if c.semantic_type == "accelerating_voltage"]
+        assert len(volts) == 2 and {(c.value, c.unit) for c in volts} == {(5, "kV")}

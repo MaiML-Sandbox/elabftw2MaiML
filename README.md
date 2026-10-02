@@ -97,13 +97,22 @@ elabftw2maiml/
     semantic_mapping.py     SemanticRule/SemanticMapping/load_mapping_file (version 2 対応表:
                           semantic_typeを中心に fields/patterns/role/target/unit を1か所で定義。
                           読み込み時に正規表現・role・target等を検証する)
-    sections.py             TextSection/SectionMapping/SectionDetector/SectionClassifier (実験本文を
-                          見出しで分割し section_type へ分類する。context=section:<種別>:<連番>)
+    sections.py             TextSection/SectionMapping/SectionDetector/SectionClassifier/
+                          Statement/StatementSplitter (実験本文を見出しで分割し section_type へ
+                          分類する。context=section:<種別>:<連番>。StatementSplitterは
+                          さらに1行=1 Statementに分け section:<種別>:<連番>/statement:<m>)
     section_mappings/
       default_sections.yaml 見出し -> section_type の既定辞書
+    operations.py           OperationMapping/OperationInterpreter (「鉄をSEM計測する」のような
+                          自然文見出しから operation / object を抽出)
+    operation_mappings/
+      default_operations.yaml 見出し中の操作語・対象語の既定辞書
+    units.py                dimension と標準単位の定義 / normalize_quantity() による単位換算
     configured_text.py      ConfiguredTextRuleInterpreter (version 2 のpatternsから自由記述を抽出し、
                           SemanticRuleのrole/targetを付与する設定駆動のInterpreter)
     field_mappings/
+      common_semantics.yaml  分野非依存のSemantic Mapping (duration / temperature /
+                          repeat_count / rotation_speed / ph)。`include:` で取り込む
       sem_tem_v2.yaml       SEM/TEM対応表 (version 2。自由記述の抽出パターンもYAMLで定義)
       sem_tem_example.yaml  SEM/TEM観察の汎用的な対応表の例 (SEM_TEM_field_mapping_example.md
                           10節のMVPフィールド一覧に対応。装置メーカーや特定研究室に依存しない
@@ -160,6 +169,9 @@ python elabftw_to_maiml.py --experiment-id 123 --output experiment_123.maiml
 | `--instrument-tag` | 任意 (複数指定可、非推奨) | 既定候補 (「Resources」「装置」等) | `--role-tag instrument=...`と同じ (互換用) |
 | `--field-mapping` | 任意 | 無し (指定しない限りPhase5の処理は一切実行されない) | Phase5-2/5-3: 実際のCustom Field名をsemantic_type/role/unit/context/targetに対応付けるYAML設定ファイルのパス。詳細は次節「対応表による構造化フィールド・自由記述の統合 (Phase 5-2/5-3)」参照 |
 | `--confidence-threshold` | 任意 (`--field-mapping`指定時のみ有効) | `1.0` | 候補を自動反映するconfidenceの閾値 |
+| `--section-mapping` | 任意 (`--field-mapping`が必要) | 無し | 実験本文を見出し単位に分割・分類するYAML (例: `section_mappings/default_sections.yaml`)。context が `section:<type>:<n>` になる |
+| `--operation-mapping` | 任意 (`--section-mapping`が必要) | 無し | 自然文の見出しから operation/object を推定する辞書YAML (例: `operation_mappings/default_operations.yaml`) |
+| `--split-statements` | 任意 (フラグ、`--section-mapping`が必要) | 無効 | セクション本文を1行=1 Statementに分割し、context を `section:<type>:<n>/statement:<m>` にする |
 
 実質必須な組み合わせ:
 
@@ -246,12 +258,19 @@ ExperimentDataへの反映段階でも維持しています)。
   として扱う。
 - 値が単位を含まない裸の数値 (`"200"`や数値そのもの) の場合は、対応表の`unit`を
   補って正規化する。
-- **単位換算 (V→kV等) は行わない** (初期実装のスコープ外)。対応表が期待する単位と
-  次元が異なる値 (例: 期待単位`kV`に対し`"200 mA"`) や、数値として解釈できない値
-  (例: `"not measured"`) は、正規化できないものとして扱い、`role`/`target`を
-  未確定にする。これにより、その値は競合としても正常値としても扱われず
-  `unclassified`に残り、変換実行時のレポートに元の値 (`raw_value`) と理由
-  (`reason`) が表示される (自動反映もされないが、黙って捨てられることもない)。
+- **単位換算**: 対応表 (version 2) に `dimension` と標準単位 (`canonical_unit`、
+  省略時は `unit`) が定義されている場合、同一次元内の単位は標準単位へ換算されます
+  (Custom Field・自由記述のどちらから取得した値にも、同じ `normalize_quantity()` を適用)。
+  例: `5000 V` -> `5 kV`、`11 h` -> `660 min`、`300 s` -> `5 min`、`1.2 µm` -> `1200 nm`。
+  換算前の値は `raw_value`、換算した旨は `reason` に残ります。値の単位は文字列内
+  (`"5000 V"`) でも `RawField.unit` でもよく、単位が無い値は標準単位とみなします。
+- **換算できない値**: 異なる次元の単位 (例: 電圧に対し `"200 mA"`)、未知の単位、
+  数値として解釈できない値 (`"not measured"`) は自動反映せず、`semantic_type` と原値
+  (`raw_value`) を保持したまま `role`/`target` を未確定にして `unclassified` に残します
+  (変換レポートに理由 `reason` が表示され、黙って捨てられることはありません)。
+- `dimension` を持たない対応表 (version 1 など) は従来通り、対応表の `unit` と
+  次元内の単位が完全一致する場合のみ正規化し、`V` と `kV` のような違いは換算せず
+  `unclassified` にします。
 - 正規化に成功した値は`InterpretationCandidate.raw_value`に元の文字列
   (例: `"200 kV"`) を保持したままなので、変換結果を後から原記録と照合できる。
 - 対応表に`unit`を指定していないフィールドでも、`data_type: number`を指定して
@@ -261,22 +280,23 @@ ExperimentDataへの反映段階でも維持しています)。
   `unit`も`data_type: number`も指定していないフィールド (文字列フィールドの大半)
   は、従来通り値をそのまま (文字列として) 扱う。
 
-単位換算が必要な値 (例: `"200000 V"`を`200 kV`として扱いたい場合) は、現時点では
-対応表の`unit`と実際の入力形式を揃えるか、値の前処理を別途検討してください
-(development planのPhase 5-4「実データによる検証」で確認する想定の項目です)。
+v1 の対応表で換算したい場合は version 2 に移行し、`dimension` を指定してください。
 
 ### 対応表 version 2 (Semantic Mapping): 自由記述も対応表で定義する
 
 `--field-mapping` のYAMLは `version` で読み分けられます (省略時は 1)。
 
-- `version: 1` (従来): Custom Field名 → semantic_type/role/target の対応のみ。
-  自由記述の抽出はPython固定の `SemTemTextRuleInterpreter` が行い、抽出値には
-  `role`/`target` が付かないため、`--confidence-threshold` を下げても自動反映
-  されません。
-- `version: 2` (Semantic Mapping): `semantic_type` を軸に、Custom Field名
-  (`fields`)・自由記述の抽出正規表現 (`patterns`)・`role`/`target`/`unit` を
-  1つの定義にまとめます。Custom Field経由でも自由記述経由でも、同じ
-  semantic_typeに到達すれば同じ `role`/`target` で ExperimentData へ反映されます。
+- `version: 1`: Custom Field名と semantic_type / role / target の対応を定義します。
+  自由記述の抽出ルール自体は Python 側の Interpreter (`SemTemTextRuleInterpreter` 等) に
+  固定されています。ただし、自由記述から得られた semantic_type が対応表に定義されて
+  いれば、`InterpretationPipeline` がその semantic_type をキーに role / target を
+  補完できます。そのため `--confidence-threshold` 等の自動反映条件を満たせば、
+  version 1 でも自由記述候補を自動反映できます (下記「自由記述への role/target の補完」)。
+- `version: 2` (Semantic Mapping): Custom Field名だけでなく自由記述の抽出パターンも
+  YAML側に定義でき、semantic_type を中心に
+  `fields` / `patterns` / `role` / `target` / `unit` / `dimension` を一元管理できます。
+  Custom Field経由でも自由記述経由でも、同じ semantic_type に到達すれば同じ
+  `role`/`target`・標準単位で ExperimentData へ反映されます。
   Pythonコードを変更せず、分野ごとの抽出ルールを追加できます。
 
 ```yaml
@@ -325,7 +345,8 @@ semantic_types:
 ```
 
 補完は、抽出器が既に設定した値を上書きせず、対応表の `unit` と単位が一致しない候補
-(例: 期待 `min` に対し `h`) には行いません (換算はしないため)。version 1 の対応表でも、
+(`dimension` が無い定義で、例: 期待 `min` に対し `h`) には行いません。`dimension` がある定義では
+標準単位へ換算してから補完します。version 1 の対応表でも、
 `semantic_type` が定義されていれば同様に補完されます。自動反映の条件
 (`--confidence-threshold`・競合なし・context確定) は従来どおりです。
 
@@ -397,8 +418,16 @@ section:observation:1  title=鉄をSEM計測する  operation=sem_measurement  o
   operation に `section_type` が定義されている場合だけ、ヒントとして使います
   (複数ヒットしたときは長いキーワードを優先)。
 - `section_type` は文書構造、`operation`/`object` は操作の意味であり、`role` とは別です。
+- 現時点では operation/object は主に分類補助とレポート表示に使い、MaiML の
+  transition / instruction を自動生成する用途には使いません。
 
 #### 同一セクション内の複数操作 (`--split-statements`)
+
+`--section-mapping` を指定すると、実験本文を見出し単位に分割して context を
+`section:<type>:<n>` として扱います。`--split-statements` を指定すると、さらにセクション
+本文を1行単位に分割し、context を `section:<type>:<n>/statement:<m>` とします。
+これにより、異なる工程や同一工程内の複数処理に書かれた duration / temperature 等が
+同一 context に集約されて不要な conflict になることを防げます。
 
 `--section-mapping` を指定したうえで `--split-statements` を付けると、セクション本文を
 1行 = 1 statement に分け、context を `section:<type>:<n>/statement:<m>` にします。
@@ -416,10 +445,14 @@ temperature/rotation_speed) と `canonical_unit` (省略時は `unit`) を書く
 (自分の定義が優先、循環 include はエラー)。`5 minx2` は `duration=5 min` と
 `repeat_count=2` に分かれます。
 
-- **未対応 (今後)**: 濃度 (`30% EtOH` のような試薬に紐づく値。試薬を表す修飾子モデルが
-  必要)、細胞濃度、statement 単位の考察文判定 (`statement_type`)、質量・体積
-  (role が文脈依存のため共通定義には未収録) は未実装です。考察文は `note` セクション内のものだけ
-  自動反映から除外されます。
+- **現時点の制約**:
+  - StatementSplitter は 1行 = 1 Statement の初期実装です。複数行で1操作を書いている場合の
+    自動結合は未対応です。
+  - operation/object は MaiML の workflow 生成には使っていません。
+  - `note` 型の見出し (考察・メモ・コメント) の本文は自動反映の対象外です。一方、protocol
+    セクション内に書かれた考察文の文単位の分類 (`statement_type`) は未実装です。
+  - 濃度 (`30% EtOH` のような試薬に紐づく値)・細胞濃度・試薬 entity の抽出、質量・体積
+    (role が文脈依存のため共通定義には未収録) は未実装です。
 - 研究室・ユーザー独自の見出しは、`default_sections.yaml` をコピーして `headings` を
   書き足してください (Pythonコードの変更は不要)。
 

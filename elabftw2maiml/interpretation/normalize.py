@@ -97,6 +97,40 @@ _NUM_UNIT_RE = re.compile(
 )
 
 
+def parse_numeric_and_unit(raw_value) -> Optional[NormalizedValue]:
+    """`raw_value` (数値または文字列) を数値と実入力の単位に分けるだけの関数。
+    期待単位との一致判定も単位換算も行わない (単位は `canonical_unit()` による
+    表記の統一のみ)。数値の場合・単位表記が無い文字列の場合、`unit` は None。
+    分離できない値 (`"not measured"`、bool など) は None。
+
+    dimension 付きの対応表では、この結果を `units.normalize_quantity()` に渡して
+    換算する (`5000 V` -> `5 kV`)。dimension が無い対応表は
+    `parse_numeric_with_unit()` で従来通り期待単位との一致を判定する。"""
+    if isinstance(raw_value, bool):
+        return None
+    if isinstance(raw_value, (int, float, Decimal)):
+        try:
+            return NormalizedValue(value=Decimal(str(raw_value)), unit=None, raw_value=raw_value)
+        except InvalidOperation:
+            return None
+    if not isinstance(raw_value, str):
+        return None
+    match = _NUM_UNIT_RE.match(raw_value)
+    if not match:
+        return None
+    number_text, unit_text = match.groups()
+    try:
+        # 桁区切りカンマ ("1,234") は正規表現で妥当性を確認済みなので除去して変換する
+        decimal_value = Decimal(number_text.replace(",", ""))
+    except InvalidOperation:
+        return None
+    return NormalizedValue(
+        value=decimal_value,
+        unit=canonical_unit(unit_text) if unit_text else None,
+        raw_value=raw_value,
+    )
+
+
 def parse_numeric_with_unit(
     raw_value, expected_unit: Optional[str] = None
 ) -> Optional[NormalizedValue]:

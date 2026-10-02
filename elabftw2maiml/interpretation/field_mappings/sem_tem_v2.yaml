@@ -142,13 +142,14 @@ semantic_types:
     data_type: string
     context: tem_analysis
     fields: [結晶相, Crystal Phase]
-  # --- Custom Fieldの定義が無く、自由記述からのみ抽出するsemantic_type ---
+  # --- 主に自由記述から抽出するsemantic_type (Custom Fieldでも入力できる) ---
   probe_current:
     role: condition
     target: conditions
     unit: pA
     dimension: current
     data_type: number
+    fields: [プローブ電流, Probe Current]
     patterns: ['(?:プローブ電流|ビーム電流|照射電流)[^\d\n]{0,6}(?P<value>-?\d[\d,]*(?:\.\d+)?)\s*(?P<unit>pA|nA|µA|μA|uA)(?![A-Za-z])']
     unit_aliases:
       uA: [µA, μA]

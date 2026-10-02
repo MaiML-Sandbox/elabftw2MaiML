@@ -21,7 +21,8 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 from .conflict import InterpretationCandidate
-from .normalize import canonical_unit, parse_numeric_with_unit
+from .normalize import canonical_unit, parse_numeric_and_unit, parse_numeric_with_unit
+from .units import normalize_quantity
 
 Number = Union[int, float, str]
 
@@ -254,7 +255,44 @@ def candidate_from_field(
     #
     # 両方が指定されていて次元が異なる場合は、値の中身を見るまでもなく
     # 自動反映を拒否し、原値と理由を残して`unclassified`に回す。
-    if (
+    if rule.dimension is not None and rule.unit is not None:
+        # dimension 付きの対応表: 自由記述側と同じ normalize_quantity() で標準単位へ換算する
+        # (5000 V -> 5 kV)。換算できない値 (次元違い・未知の単位・数値でない値) は
+        # 原値と理由を残して自動反映しない。
+        parsed = parse_numeric_and_unit(raw.value)
+        # 値の文字列に単位があればそれを、無ければ raw.unit、それも無ければ標準単位とみなす
+        source_unit = (
+            parsed.unit if parsed is not None and parsed.unit is not None
+            else canonical_unit(raw.unit)
+        )
+        if source_unit is None:
+            source_unit = rule.unit
+        converted = (
+            normalize_quantity(parsed.value, source_unit, rule.dimension, rule.unit)
+            if parsed is not None else None
+        )
+        if converted is None:
+            role = None
+            target = None
+            raw_value = raw.value
+            unit = None
+            reason = (
+                f"単位換算できないため自動反映を無効化しました "
+                f"(raw_value={raw.value!r}, raw.unit={raw.unit!r}, "
+                f"dimension={rule.dimension!r}, 標準単位={rule.unit!r}: 次元不一致または数値でない値)"
+            )
+        else:
+            value, unit = converted
+            if canonical_unit(source_unit) == canonical_unit(rule.unit):
+                # 換算不要: 従来通りの Decimal 値を保持する
+                value = parsed.value
+                raw_value = parsed.raw_value
+            else:
+                raw_value = parsed.raw_value
+                reason = (
+                    f"{parsed.value} {source_unit} を標準単位 {value} {unit} に換算しました"
+                )
+    elif (
         rule.unit is not None
         and raw.unit is not None
         and canonical_unit(rule.unit) != canonical_unit(raw.unit)
