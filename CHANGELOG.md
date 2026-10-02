@@ -4,6 +4,17 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Custom Field の `raw.value` 内の単位と `raw.unit` が両方あって一致しない場合
+  (`"5000 V"` + `mA`、同一次元でも `"5000 V"` + `kV`) は自動反映せず `unclassified`
+  にする (`semantic_type`・原値・理由を保持)。以前は `raw.unit` が無視されていた。
+- 単位換算後の Custom Field/自由記述の conflict テストを、両者の context を `experiment` に
+  揃えて実際に同じ conflict group で比較するものに修正 (同値 5000 V vs 5 kV は conflict 0、
+  異値 5000 V vs 10 kV は conflict 1)。
+- README に残っていた「`TextRuleInterpreter` は未接続」「conflict は単体のみ」等の
+  過去Phaseの説明を現行実装に更新。
+
 ### Added
 
 - **Custom Field 由来の値にも `dimension` 単位換算を適用** (`candidate_from_field()`)。

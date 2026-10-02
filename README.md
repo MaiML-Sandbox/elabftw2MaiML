@@ -264,6 +264,9 @@ ExperimentDataへの反映段階でも維持しています)。
   例: `5000 V` -> `5 kV`、`11 h` -> `660 min`、`300 s` -> `5 min`、`1.2 µm` -> `1200 nm`。
   換算前の値は `raw_value`、換算した旨は `reason` に残ります。値の単位は文字列内
   (`"5000 V"`) でも `RawField.unit` でもよく、単位が無い値は標準単位とみなします。
+  値の文字列内の単位と `RawField.unit` が両方あって一致しない場合 (`"5000 V"` と `mA`、
+  同一次元でも `"5000 V"` と `kV`) は、入力者の意図を決められないため自動反映せず
+  `unclassified` にします (一致していれば、例えば `"5 kV"` と `kV` は正常値です)。
 - **換算できない値**: 異なる次元の単位 (例: 電圧に対し `"200 mA"`)、未知の単位、
   数値として解釈できない値 (`"not measured"`) は自動反映せず、`semantic_type` と原値
   (`raw_value`) を保持したまま `role`/`target` を未確定にして `unclassified` に残します
@@ -484,19 +487,20 @@ python -m pytest tests/
 - `tests/test_text_rule_interpreter.py`: `TextRuleInterpreter` (自由記述からの
   温度・時間・質量・体積・回転数・pH抽出) の単体テスト。development planの
   worked example (「40 ℃で30分加熱した。」) を含む。
-  **注意**: `TextRuleInterpreter` は現時点では単体で完結しており、
-  `fetch_experiment()`/`ExperimentData`/MaiML出力にはまだ接続していない
-  (development planのPhase 4「競合検出」・Phase 5「MaiML出力との接続」で
-  今後つなぎ込む予定)。
+  `TextRuleInterpreter` は、実験本文およびStep本文から temperature / duration / mass /
+  volume / rotation_speed / pH / repeat_count 等を抽出します。抽出結果は
+  `InterpretationPipeline` に渡され、Semantic Mappingによる role/target 補完、単位正規化、
+  conflict判定、confidence判定を経て、accepted候補のみ `apply_interpretation_report()` により
+  `ExperimentData` へ反映されます (`MaimlBuilder` が MaiML に出力)。
 - `tests/test_conflict.py`: `InterpretationCandidate`/`Conflict`/
   `detect_conflicts()`/`format_conflict_report()` の単体テスト。development
   planの例 (カスタムフィールド: Temperature=50℃ / 自由記述: 40℃で30分加熱した。
   が競合として検出されること) を含む。
-  **注意**: こちらも現時点では汎用の突き合わせロジックのみを提供する単体の
-  コンポーネントであり、実際のeLabFTWカスタムフィールドをどの意味種別
-  (temperature/duration/...) に対応付けるかの判断はまだ行っていない
-  (フィールド名からの自動対応付けは、実運用でのフィールド命名を確認した上で
-  別途検討する)。
+  `test_conflict.py` は `InterpretationCandidate` 間の値不一致を検出する conflict 判定
+  ロジックを検証します。実運用では、Custom Field由来候補と自由記述由来候補を
+  `InterpretationPipeline` 内で統合し、`semantic_type` / `context` / `role` / `target` が
+  一致する候補群について値の一致・不一致を判定します (context が異なる候補同士は
+  比較されません)。
 - `tests/test_policy.py`: `policy.py` (`DEFAULT_SOURCE_CONFIDENCE`/
   `candidate_from_extracted_value()`/`candidate_confidence_for_source()`) の
   単体テスト。`ExtractedValue.confidence` (抽出ルールの一致確実性。正規表現が
@@ -508,7 +512,7 @@ python -m pytest tests/
   3パターン ((1) 構造化フィールドのみ、(2) 自由記述のみ、(3) 構造化フィールドと
   自由記述が矛盾する場合) を、`TextRuleInterpreter.extract()` ->
   `candidate_from_extracted_value()` -> `detect_conflicts()` という実際の
-  呼び出し順序で通し、組み合わせたときの挙動を今後の回帰基準として固定する。
+  呼び出し順序で通し、組み合わせたときの挙動を回帰基準として固定する。
 - `tests/test_pipeline.py`: `interpretation/pipeline.py` (Phase5-1の接続基盤)
   の単体テスト。`ExperimentData`/`Step`の`body_text`/`body`から自由記述候補を
   収集してcontext ("experiment"/"step:<id>") を付与すること、構造化候補

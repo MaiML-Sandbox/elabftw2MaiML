@@ -260,18 +260,31 @@ def candidate_from_field(
         # (5000 V -> 5 kV)。換算できない値 (次元違い・未知の単位・数値でない値) は
         # 原値と理由を残して自動反映しない。
         parsed = parse_numeric_and_unit(raw.value)
-        # 値の文字列に単位があればそれを、無ければ raw.unit、それも無ければ標準単位とみなす
-        source_unit = (
-            parsed.unit if parsed is not None and parsed.unit is not None
-            else canonical_unit(raw.unit)
+        embedded_unit = parsed.unit if parsed is not None else None
+        explicit_unit = canonical_unit(raw.unit)
+        unit_conflict = (
+            embedded_unit is not None
+            and explicit_unit is not None
+            and embedded_unit != explicit_unit
         )
-        if source_unit is None:
-            source_unit = rule.unit
+        # 値の文字列内の単位と raw.unit が両方あるときは、同一次元でも (例: "5000 V" と
+        # "kV") 入力者の意図を一意に決められないため、一致しなければ安全側で自動反映しない。
+        # どちらか一方だけなら、その単位を使う。どちらも無ければ標準単位とみなす。
+        source_unit = embedded_unit or explicit_unit or rule.unit
         converted = (
             normalize_quantity(parsed.value, source_unit, rule.dimension, rule.unit)
-            if parsed is not None else None
+            if parsed is not None and not unit_conflict else None
         )
-        if converted is None:
+        if unit_conflict:
+            role = None
+            target = None
+            raw_value = raw.value
+            unit = None
+            reason = (
+                f"value内の単位 {embedded_unit} と raw.unit {explicit_unit} が一致しないため"
+                f"自動反映を無効化しました (raw_value={raw.value!r}, raw.unit={raw.unit!r})"
+            )
+        elif converted is None:
             role = None
             target = None
             raw_value = raw.value

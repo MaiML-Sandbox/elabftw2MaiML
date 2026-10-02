@@ -493,10 +493,72 @@ class TestCustomFieldUnitConversion:
         assert parse_numeric_and_unit("not measured") is None
         assert parse_numeric_and_unit(True) is None
 
-    def test_custom_field_and_free_text_agree_without_conflict(self):
-        structured = [cf("加速電圧", "5000 V")]
-        exp = ExperimentData(elab_id=1, title="t", date=None, body_text="観察\n加速電圧 5 kV で観察")
+    # --- value内の単位と raw.unit の矛盾 ---
+    @pytest.mark.parametrize("value, unit", [("5000 V", "mA"), ("5000 V", "kV")])
+    def test_embedded_unit_and_raw_unit_mismatch_is_rejected(self, value, unit):
+        c = cf("加速電圧", value, unit)
+        assert c.semantic_type == "accelerating_voltage"
+        assert (c.role, c.target) == (None, None)
+        assert c.raw_value == value and c.unit is None
+        assert "一致しない" in c.reason and unit in c.reason
+
+    def test_embedded_unit_and_raw_unit_agree(self):
+        c = cf("加速電圧", "5 kV", "kV")
+        assert (c.value, c.unit, c.role) == (5, "kV", "condition")
+        c = cf("加速電圧", "5000 V", "V")
+        assert (c.value, c.unit) == (5, "kV")
+
+    def test_unit_spelling_variants_are_not_mismatches(self):
+        c = cf("Particle Size", "1.2 µm", "um")
+        assert (c.value, c.unit) == (1200, "nm")
+
+    def test_accepted_when_units_agree_via_pipeline(self):
+        exp = ExperimentData(elab_id=1, title="t", date=None, body_text="")
+        report = pipeline().interpret_experiment(
+            exp, structured_candidates=[candidate_from_field(
+                RawField(name="加速電圧", value="5 kV", unit="kV"), FM,
+                context_override="experiment")])
+        assert [(c.semantic_type, c.value, c.unit) for c in report.accepted] == [
+            ("accelerating_voltage", 5, "kV")]
+
+
+class TestCustomFieldAndFreeTextConflict:
+    """Custom Field と自由記述を同じ context (experiment) に揃えて突き合わせる。
+    conflict 判定は (semantic_type, context, role, target) 単位なので、context が異なると
+    そもそも比較されない。ここでは Section 分割を使わず両方 experiment にする。"""
+
+    def _run(self, body, field_value="5000 V"):
+        structured = [candidate_from_field(
+            RawField(name="加速電圧", value=field_value), FM, context_override="experiment")]
+        p = InterpretationPipeline(
+            confidence_threshold=0.95, field_mapping=FM,
+            extra_text_interpreters=LOADED.text_interpreters)
+        exp = ExperimentData(elab_id=1, title="t", date=None, body_text=body)
+        return p.interpret_experiment(exp, structured_candidates=structured)
+
+    @staticmethod
+    def _volts(report):
+        return [c for c in report.candidates if c.semantic_type == "accelerating_voltage"]
+
+    def test_same_value_after_conversion_has_no_conflict(self):
+        report = self._run("加速電圧 5 kV で観察")
+        volts = self._volts(report)
+        assert len(volts) == 2
+        assert {c.context for c in volts} == {"experiment"}   # 同じ group に入っている
+        assert {(c.value, c.unit) for c in volts} == {(5, "kV")}
+        assert report.conflicts == []
+
+    def test_different_value_is_a_conflict(self):
+        report = self._run("加速電圧 10 kV で観察")
+        assert {c.context for c in self._volts(report)} == {"experiment"}
+        assert len(report.conflicts) == 1
+        assert report.conflicts[0].semantic_type == "accelerating_voltage"
+        assert report.accepted == [] or all(
+            c.semantic_type != "accelerating_voltage" for c in report.accepted)
+
+    def test_different_contexts_are_not_compared(self):
+        # 参考: context が異なれば、値が違っても conflict にならない (比較対象外)
+        structured = [candidate_from_field(RawField(name="加速電圧", value="5000 V"), FM)]
+        exp = ExperimentData(elab_id=1, title="t", date=None, body_text="観察\n加速電圧 10 kV")
         report = pipeline().interpret_experiment(exp, structured_candidates=structured)
         assert report.conflicts == []
-        volts = [c for c in report.candidates if c.semantic_type == "accelerating_voltage"]
-        assert len(volts) == 2 and {(c.value, c.unit) for c in volts} == {(5, "kV")}
