@@ -6,6 +6,11 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- README の精査: `test_build_and_validate.py`/`schemas/maiml.xsd` の記述 (XSDは未同梱)、
+  セットアップの依存 (pyyaml)・テスト実行 (`requirements-dev.txt`)、モジュール一覧
+  (normalize.py/_spans.py ほか)、context の説明 (section/statement)、contextが異なる候補は
+  比較されない旨、v2 の例への `dimension` 追記、重複・順序が崩れていた箇所
+  (マッピング表と STEP 連鎖の節、`--split-statements` の説明)、テスト一覧の不足分を修正。
 - Custom Field にも Semantic Mapping の `unit_aliases` を適用 (`FieldRule.unit_aliases`、
   共通関数 `normalize.normalize_unit_alias()`: 大域の表記統一 -> 対応表固有の alias)。
   `5 KV`/`5 kv` -> `5 kV`、`1.2 μm` -> `1200 nm`、`0.002 μA` -> `2000 pA`。単位矛盾チェックも

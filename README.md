@@ -13,12 +13,14 @@ eLabFTW (REST API v2 / `elabapi-python`) の実験データを、JIS K 0200 (Mai
 **実験データの入力は eLabFTW の GUI（ブラウザ / `elabftw/desktop`）で行い、本ツールはその結果を
 読み出して MaiML に変換するだけ**、という運用を想定しています（書き込みは行いません）。
 
-同梱の `test_build_and_validate.py` で、合成データを使い実際に `schemas/maiml.xsd` に対して
-スキーマ検証を行い、生成XMLが仕様に適合することを確認済みです。
+同梱の `test_build_and_validate.py` は、合成データから生成したXMLを `schemas/maiml.xsd` に対して
+スキーマ検証するスクリプトです。**`schemas/maiml.xsd` はこのリポジトリには含まれていません**
+(MaiML公式スキーマを `schemas/maiml.xsd` として別途配置してください。無い環境では実行できません。
+`pytest` 側の検証テストはXSDが無ければスキップされます)。
 
 ```
 python3 test_build_and_validate.py
-# -> Schema valid: True
+# -> OK: both sample outputs are valid against maiml.xsd
 ```
 
 ## 対応するeLabFTWバージョン
@@ -80,7 +82,11 @@ elabftw2maiml/
   interpretation/      構造情報・自由記述からの判定ロジック (elabftw_client.pyから分離)
     model.py            判定結果モデル (InterpretationResult: role/confidence/source/reason)
     structured.py        StructuredRuleInterpreter (Category/Tag/Custom Field GroupからのRole判定)
-    text.py              TextRuleInterpreter (自由記述からの温度/時間/質量/体積/回転数/pH抽出)
+    text.py              TextRuleInterpreter (自由記述からの温度/時間/質量/体積/回転数/pH/繰り返し回数
+                          (`5 minx2` -> duration + repeat_count) の抽出)
+    normalize.py         単位表記の正規化 (parse_numeric_and_unit / parse_numeric_with_unit /
+                          normalize_unit_alias。Custom Field・自由記述で共通)
+    _spans.py            抽出結果の重複除去 (内部用)
     conflict.py          InterpretationCandidate/Conflict (構造化情報と自由記述の値の突き合わせ)
     policy.py             情報源ごとのconfidenceポリシー (DEFAULT_SOURCE_CONFIDENCE等)
     pipeline.py            InterpretationPipeline/InterpretationReport (Phase5-1: 自由記述候補の
@@ -93,10 +99,12 @@ elabftw2maiml/
                           既存の値は上書きせずスキップする)
     field_mapping.py        RawField/FieldRule/FieldMapping (Phase5-2: eLabFTWのCustom Field名を
                           role/semantic_type/unit/context/targetに対応付ける設定可能な対応表。
+                          dimension/unit_aliasesも保持し、Custom Fieldの値を標準単位へ換算する。
                           対応表自体はYAML/dictとして外部化されており、コードには固定しない)
     semantic_mapping.py     SemanticRule/SemanticMapping/load_mapping_file (version 2 対応表:
-                          semantic_typeを中心に fields/patterns/role/target/unit を1か所で定義。
-                          読み込み時に正規表現・role・target等を検証する)
+                          semantic_typeを中心に fields/patterns/role/target/unit/dimension/
+                          unit_aliases を1か所で定義し、`include:` で共通定義を取り込める。
+                          読み込み時に正規表現・role・target・dimension等を検証する)
     sections.py             TextSection/SectionMapping/SectionDetector/SectionClassifier/
                           Statement/StatementSplitter (実験本文を見出しで分割し section_type へ
                           分類する。context=section:<種別>:<連番>。StatementSplitterは
@@ -135,7 +143,7 @@ tests/                 pytestによる回帰テスト・単体テスト (詳細�
 ## セットアップ
 
 ```bash
-pip install elabapi-python lxml
+pip install elabapi-python lxml pyyaml      # pyyaml は --field-mapping / --section-mapping / --operation-mapping を使う場合に必要
 export ELABFTW_HOST="https://elab.example.org/api/v2"
 export ELABFTW_API_KEY="xxxxxxxxxxxxxxxxxxxx"     # eLabFTWのユーザー設定 > API keys で発行
 
@@ -200,8 +208,9 @@ material/condition/resultに振り分けます (Phase 1〜4の既存動作、変
 1. 対応表に定義されたCustom Field名を `semantic_type`/`role`/`context`/
    `target` を持つ候補 (structured candidates) に変換する。
 2. 実験本文・各Stepの本文から、自由記述のルールベース抽出
-   (`TextRuleInterpreter` + SEM/TEM固有の`SemTemTextRuleInterpreter`) で
-   候補を収集する。
+   (汎用の`TextRuleInterpreter` + 分野固有の抽出器: version 1 は
+   `SemTemTextRuleInterpreter`、version 2 は対応表の`patterns`から作る
+   `ConfiguredTextRuleInterpreter`) で候補を収集する。
 3. 1と2を統合し、同じ意味種別・同じcontextの値が食い違っていないか確認する
    (`interpretation.detect_conflicts()`)。
 4. 食い違いが無く、`role`/`semantic_type`/`context`/`target`が全て確定した
@@ -231,7 +240,9 @@ python elabftw_to_maiml.py --experiment-id 123 --output out.maiml \
 扱われる。反映先のオブジェクトは`candidate.context`から決まる:
 `context`が`"experiment"` (既定) なら実験全体を表す1つのオブジェクトに、
 `context`が`"step:<id>"` (`interpretation.pipeline.step_context()`が返す形式)
-ならそのStep専用のオブジェクトに、それぞれ集約される
+ならそのStep専用のオブジェクトに、`--section-mapping`使用時の
+`"section:<type>:<n>"` / `"section:<type>:<n>/statement:<m>"` ならそのセクション(文)専用の
+オブジェクトに、それぞれ集約される
 (`interpretation/apply.py`の`_find_or_create_container()`参照)。
 
 **旧バージョン (v0.3.x以前) との違い**: 旧target名`condition_properties`/
@@ -251,8 +262,9 @@ ExperimentDataへの反映段階でも維持しています)。
 **構造化フィールドの単位正規化**: eLabFTWのExtra Fieldsは値と単位を別々に持つ
 仕組みが無く、単位はフィールド名 (`AcceleratingVoltage(kV)`等) や値の文字列
 (`"200 kV"`等) に含まれることがあります。競合判定 (`detect_conflicts()`) の前に、
-`interpretation/normalize.py` の`parse_numeric_with_unit()`が構造化フィールドの値を
-自由記述側と同じ内部表現 (数値 + 正規化後の単位、内部的には`Decimal`) に揃えます。
+`interpretation/normalize.py` (`parse_numeric_and_unit()` / `parse_numeric_with_unit()` /
+`normalize_unit_alias()`) と `interpretation/units.py` (`normalize_quantity()`) が、構造化フィールドの値を
+自由記述側と同じ内部表現 (数値 + 正規化後の単位) に揃えます。
 
 - 空白の有無 (`"200 kV"`/`"200kV"`) や、µ/μ/u・°/度などの表記の揺れは同一の単位
   として扱う。
@@ -311,7 +323,8 @@ semantic_types:
   accelerating_voltage:
     role: condition
     target: conditions
-    unit: kV
+    unit: kV                                       # 標準単位 (canonical_unit 省略時)
+    dimension: voltage                             # 同一次元の単位を標準単位へ換算する
     data_type: number
     fields: [加速電圧, Acceleration Voltage, HV]   # Custom Field名 / alias
     unit_aliases: {kV: [KV, kv]}                   # 生の表記 -> 正規化後の単位
@@ -330,7 +343,7 @@ semantic_typeに定義することはできません。単位だけの表現 ("5
 自由記述由来の候補のconfidenceは従来通り0.95なので、
 `--confidence-threshold 0.95` を指定すると、他の自動反映条件
 (競合なし・role/target/context確定) を満たす自由記述候補が反映されます
-(contextは `step:<id>` / `experiment`)。同梱の `sem_tem_v2.yaml` は
+(contextは `experiment` / `step:<id>`、`--section-mapping` 使用時は `section:<type>:<n>`)。同梱の `sem_tem_v2.yaml` は
 `sem_tem_example.yaml` と同じCustom Field対応に、従来Pythonに固定されていた
 SEM/TEMの8種の抽出パターンを加えたものです (出力は
 `SemTemTextRuleInterpreter` と一致することをテストで確認しています)。
@@ -357,9 +370,13 @@ semantic_types:
 (`--confidence-threshold`・競合なし・context確定) は従来どおりです。
 
 注意: Custom Fieldの候補のcontextは対応表の `context` (未指定ならNone)、
-自由記述の候補のcontextは原文の位置 (`experiment`/`step:<id>`) です。競合判定は
-`(semantic_type, context, role, target)` 単位なので、両者を突き合わせたい場合は
-Custom Field側の `context` を `experiment` などに合わせてください。
+自由記述の候補のcontextは原文の位置 (`experiment`/`step:<id>`、`--section-mapping` 使用時は
+`section:<type>:<n>` など) です。競合判定は
+`(semantic_type, context, role, target)` 単位で、**contextが異なる候補同士は比較されません**
+(値が違っても競合になりません)。両者を突き合わせたい場合は
+Custom Field側の `context` を自由記述側と同じ値 (`experiment` など) に合わせてください。
+セクション分割を使う場合、Custom Field側は `section:...` に合わせにくいため、突き合わせは
+実質的に `experiment` context 同士に限られます。
 
 ### 実験本文のセクション分割・分類 (`--section-mapping`)
 
@@ -409,6 +426,9 @@ STEP や MaiML の transition は生成しません。STEP本文は従来通り 
   伴う v2 の `patterns` だけを見出しに適用します。「20 min」のように単位だけで判定する
   汎用抽出器は見出しには適用しません (見出し「20 min」を時間条件にしないため)。
 
+- 研究室・ユーザー独自の見出しは、`default_sections.yaml` をコピーして `headings` を
+  書き足してください (Pythonコードの変更は不要)。
+
 #### 見出しの自然文からの操作推定 (`--operation-mapping`)
 
 辞書に無い見出し (「鉄をSEM計測する」) は通常 `unknown` ですが、`--operation-mapping`
@@ -435,8 +455,6 @@ section:observation:1  title=鉄をSEM計測する  operation=sem_measurement  o
 これにより、異なる工程や同一工程内の複数処理に書かれた duration / temperature 等が
 同一 context に集約されて不要な conflict になることを防げます。
 
-`--section-mapping` を指定したうえで `--split-statements` を付けると、セクション本文を
-1行 = 1 statement に分け、context を `section:<type>:<n>/statement:<m>` にします。
 脱水の `5 min` / `10 min` / `10 min` のように、同じセクション内で値の異なる操作が並ぶ場合の
 競合を避けられます (見出し直後の前置き本文は分割しません)。
 
@@ -451,16 +469,19 @@ temperature/rotation_speed) と `canonical_unit` (省略時は `unit`) を書く
 (自分の定義が優先、循環 include はエラー)。`5 minx2` は `duration=5 min` と
 `repeat_count=2` に分かれます。
 
-- **現時点の制約**:
-  - StatementSplitter は 1行 = 1 Statement の初期実装です。複数行で1操作を書いている場合の
-    自動結合は未対応です。
-  - operation/object は MaiML の workflow 生成には使っていません。
-  - `note` 型の見出し (考察・メモ・コメント) の本文は自動反映の対象外です。一方、protocol
-    セクション内に書かれた考察文の文単位の分類 (`statement_type`) は未実装です。
-  - 濃度 (`30% EtOH` のような試薬に紐づく値)・細胞濃度・試薬 entity の抽出、質量・体積
-    (role が文脈依存のため共通定義には未収録) は未実装です。
-- 研究室・ユーザー独自の見出しは、`default_sections.yaml` をコピーして `headings` を
-  書き足してください (Pythonコードの変更は不要)。
+#### Section / Statement / 単位処理の現時点の制約
+
+- StatementSplitter は 1行 = 1 Statement の初期実装です。複数行で1操作を書いている場合の
+  自動結合は未対応です。
+- operation/object は MaiML の workflow (STEP/transition) 生成には使っていません。
+  Section から MaiML STEP への自動昇格も行いません。
+- `note` 型の見出し (考察・メモ・コメント) の本文は自動反映の対象外です。一方、protocol
+  セクション内に書かれた考察文の文単位の分類 (`statement_type`) は未実装です。
+- 濃度 (`30% EtOH` のような試薬に紐づく値)・細胞濃度・試薬 entity の抽出は未実装です。
+  質量・体積は汎用抽出器が値を取り出しますが、役割 (試料の量か試薬の量か) が文脈で変わるため
+  共通定義 (`common_semantics.yaml`) には入れておらず、対応表で `semantic_type` を定義した場合だけ
+  `role`/`target` が補完されます。
+- LLM による解釈は行いません (ルールベースのみ)。
 
 ## テスト
 
@@ -469,7 +490,7 @@ temperature/rotation_speed) と `canonical_unit` (省略時は `unit`) を書く
 `tests/` に用意している。
 
 ```bash
-pip install pytest
+pip install -r requirements-dev.txt     # pytest / pyyaml / elabapi-python / lxml
 python -m pytest tests/
 ```
 
@@ -575,6 +596,15 @@ python -m pytest tests/
 - `tests/test_sections.py`: 実験本文のセクション分割・分類 (`sections.py`) の見出し検出・
   正規化と分類・未知見出し・同名見出しの連番/階層path・パイプライン接続 (競合回避・note除外)・
   実際の実験ノート (`note_cell_prep_sem.txt`)・CLI `--section-mapping`。
+- `tests/test_normalize.py`: `normalize.py` の単位表記正規化・数値と単位の分離。
+- `tests/test_section_semantic_review_fixes.py`: 単位換算 (`dimension`/`canonical_unit`/
+  `unit_aliases`、Custom Field と自由記述の対称性、値内単位と `raw.unit` の矛盾検出)、`include:`、
+  共通 semantics、StatementSplitter、`5 minx2`、Operation Interpreter、同一 context での
+  Custom Field/自由記述の conflict 判定、`--operation-mapping`/`--split-statements`。
+- `tests/test_structural_regression_multistep.py`: 複数Step・複数Conditionでの構造 (PNML/placeRef/
+  templateRef) の回帰テスト。
+- `tests/test_yasunaga_lab_stem_field_mapping.py`: 同梱の `yasunaga_lab_stem.yaml` の読み込みと
+  対応付けのテスト。
 - `tests/test_cli_field_mapping.py`: `elabftw_to_maiml.py`の`--field-mapping`
   オプション (Phase5-3のCLI統合) のテスト。ネットワークに接続せず
   `tests.fixtures`の合成データで`ElabftwClient`を差し替え、CLI全体が
@@ -593,15 +623,17 @@ python -m pytest tests/
 | 実験の作成日時 (`date`/`created_at`) | `document/date` | ISO8601に変換 |
 | 実験のStep一覧 (Steps API, `ordering`順) | `protocol/method/pnml` の `transition` (直列に接続) + `program/instruction` | 1 Step = 1 transition = 1 instruction |
 | リンクされたアイテム (`items_links`、詳細は `ItemsApi.get_item`) | 最初のSTEPの `materialTemplate`(M1) + `data/.../material` | アイテムのExtra Fieldsを `property` に変換。実データはここに持たせる |
-| 実験のExtra Fields (`metadata.extra_fields`。creator/vendorに使ったフィールドは除外) | 最初のSTEPの `conditionTemplate`(C1) + `data/.../condition` | 1つの `conditionTemplate`/`condition` にまとめて格納 |
+| 実験のExtra Fields (`metadata.extra_fields`。creator/vendorに使ったフィールドは除外) | 最初のSTEPの `conditionTemplate`(C1) + `data/.../condition` | `ExperimentData.conditions` の要素ごとに `conditionTemplate`/`condition` を1つ作成 (通常は実験自身のExtra Fieldsを集約した1つ) |
 | 実験本文 (`body`, HTMLタグ除去) / タグ (`tags`) / 添付ファイル | 最後のSTEPの `resultTemplate`/`result` の `property`/`insertion` | 実データは最後のSTEPに集約する |
+| 添付ファイル (`uploads`, ハッシュ値含む) | `data/.../result/insertion` | ダウンロードURL + ハッシュ値を参照として記録 (ファイル本体はMaiMLに埋め込まない) |
+| 各Stepの開始/終了 (`finished_time`) | `eventLog/log/trace/event` (start/complete) | 最終Stepのcompleteイベントに `resultsRef` を付与 (仕様R-16準拠) |
 
 ### STEP間のmaterial/condition/result連鎖
 
 MaiMLでは各STEPがmaterial/condition/resultを持ち、直列に接続する場合は前STEPの結果が
 次STEPの入力材料として引き継がれる、という考え方をとります。eLabFTWのSteps APIには
 Step単位の構造化されたmaterial/result情報が無いため (`body`の自由記述テキストのみ)、
-以下の既定パターンで機械的に接続しています:
+以下の既定パターンで機械的に接続しています。
 
 MaiMLでは、materialTemplate / conditionTemplate と各STEPのresultTemplateの工程上の関係を、
 PNMLのplace/transition/arc、および各Templateの`placeRef`で表現します。
@@ -625,8 +657,6 @@ material/conditionがPNML/`placeRef`でSTEP1に入力され、その出力がR1�
 **制約**: 途中で新しい試料 (別material) を追加する分岐フローは、eLabFTW側にSTEP単位の
 構造化情報が無いため自動判定できません。そのような実験がある場合は、生成後のXMLを
 手動編集するか、`elabftw_client.py`側でStep本文の記法解析等を追加実装してください。
-| 添付ファイル (`uploads`, ハッシュ値含む) | `data/.../result/insertion` | ダウンロードURL + ハッシュ値を参照として記録 (ファイル本体はMaiMLに埋め込まない) |
-| 各Stepの開始/終了 (`finished_time`) | `eventLog/log/trace/event` (start/complete) | 最終Stepのcompleteイベントに `resultsRef` を付与 (仕様R-16準拠) |
 
 ### creator/vendor/instrumentの既定検索フィールド名
 
