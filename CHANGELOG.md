@@ -6,6 +6,13 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- Custom Field にも Semantic Mapping の `unit_aliases` を適用 (`FieldRule.unit_aliases`、
+  共通関数 `normalize.normalize_unit_alias()`: 大域の表記統一 -> 対応表固有の alias)。
+  `5 KV`/`5 kv` -> `5 kV`、`1.2 μm` -> `1200 nm`、`0.002 μA` -> `2000 pA`。単位矛盾チェックも
+  alias 正規化後に行う (`"5 KV"` + `raw.unit="kV"` は一致)。自由記述側の
+  `SemanticRule.normalize_unit()` も同じ関数を使う。
+- README の「STEP間material/condition/result連鎖」を現行 Builder に合わせて修正
+  (最初の resultTemplate は templateRef なし。material/condition との接続は PNML/placeRef)。
 - Custom Field の `raw.value` 内の単位と `raw.unit` が両方あって一致しない場合
   (`"5000 V"` + `mA`、同一次元でも `"5000 V"` + `kV`) は自動反映せず `unclassified`
   にする (`semantic_type`・原値・理由を保持)。以前は `raw.unit` が無視されていた。

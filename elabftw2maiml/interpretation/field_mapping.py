@@ -21,7 +21,12 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 from .conflict import InterpretationCandidate
-from .normalize import canonical_unit, parse_numeric_and_unit, parse_numeric_with_unit
+from .normalize import (
+    canonical_unit,
+    normalize_unit_alias,
+    parse_numeric_and_unit,
+    parse_numeric_with_unit,
+)
 from .units import normalize_quantity
 
 Number = Union[int, float, str]
@@ -65,6 +70,8 @@ class FieldRule:
     required: bool = False
     aliases: Tuple[str, ...] = ()
     dimension: Optional[str] = None
+    # Semantic Mapping v2 の unit_aliases ((生の表記, 正規化後) の組)。Custom Field の単位にも適用する
+    unit_aliases: Tuple[Tuple[str, str], ...] = ()
 
 
 class FieldMapping:
@@ -260,8 +267,13 @@ def candidate_from_field(
         # (5000 V -> 5 kV)。換算できない値 (次元違い・未知の単位・数値でない値) は
         # 原値と理由を残して自動反映しない。
         parsed = parse_numeric_and_unit(raw.value)
-        embedded_unit = parsed.unit if parsed is not None else None
-        explicit_unit = canonical_unit(raw.unit)
+        # 矛盾チェックの前に、Semantic Mapping 固有の unit_aliases を適用して正規化する
+        # (`KV` と `kV` を別の単位として矛盾扱いしないため)
+        embedded_unit = (
+            normalize_unit_alias(parsed.unit, rule.unit_aliases, rule.unit)
+            if parsed is not None else None
+        )
+        explicit_unit = normalize_unit_alias(raw.unit, rule.unit_aliases, rule.unit)
         unit_conflict = (
             embedded_unit is not None
             and explicit_unit is not None

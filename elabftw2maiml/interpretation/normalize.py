@@ -39,7 +39,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from typing import Optional, Union
+from typing import Optional, Sequence, Tuple, Union
 
 Number = Union[int, float, str]
 
@@ -76,6 +76,40 @@ def canonical_unit(raw_unit: Optional[str]) -> Optional[str]:
         if cleaned in aliases:
             return canonical
     return cleaned
+
+
+def normalize_unit_alias(
+    raw_unit: Optional[str],
+    aliases: Sequence[Tuple[str, str]] = (),
+    standard_unit: Optional[str] = None,
+) -> Optional[str]:
+    """単位表記を正規化する共通関数 (自由記述・Custom Field の両方が使う)。
+
+    処理順: (1) 大域の表記統一 `canonical_unit()` (µ/μ/u・℃/°C など)
+    -> (2) Semantic Mapping 固有の `unit_aliases` (`(生の表記, 正規化後)` の組。例:
+    `("KV", "kV")`)。`standard_unit` と各 alias の右辺自身は暗黙に有効。
+    aliases の照合は完全一致 -> 大文字小文字を無視、の順。どれにも当たらない表記は
+    (大域正規化後の) そのまま返す (未知の単位を黙って捨てない)。
+    """
+    if raw_unit is None:
+        return None
+    cleaned = raw_unit.strip()
+    if not cleaned:
+        return None
+    table: dict = {}
+    if standard_unit:
+        table[standard_unit] = standard_unit
+    for raw, norm in aliases:
+        table[raw] = norm
+        table.setdefault(norm, norm)
+    for candidate in (cleaned, canonical_unit(cleaned)):
+        if candidate in table:
+            return table[candidate]
+    folded = {k.lower(): v for k, v in table.items()}
+    for candidate in (cleaned, canonical_unit(cleaned)):
+        if candidate.lower() in folded:
+            return folded[candidate.lower()]
+    return canonical_unit(cleaned)
 
 
 # 先頭の数値 (符号・桁区切りカンマ・小数点・指数表記を含む) + 残りの単位表記、

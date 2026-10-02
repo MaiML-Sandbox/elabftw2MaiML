@@ -264,7 +264,10 @@ ExperimentDataへの反映段階でも維持しています)。
   例: `5000 V` -> `5 kV`、`11 h` -> `660 min`、`300 s` -> `5 min`、`1.2 µm` -> `1200 nm`。
   換算前の値は `raw_value`、換算した旨は `reason` に残ります。値の単位は文字列内
   (`"5000 V"`) でも `RawField.unit` でもよく、単位が無い値は標準単位とみなします。
-  値の文字列内の単位と `RawField.unit` が両方あって一致しない場合 (`"5000 V"` と `mA`、
+  単位の別名は、大域の表記統一 (µ/μ/u・℃ など) の後に、対応表 version 2 の `unit_aliases`
+  (例: `kV: [KV, kv]`) を Custom Field・自由記述の両方に適用します (`5 KV` は `5 kV`。
+  KV は kV の別表記なので値は換算されません)。
+  値の文字列内の単位と `RawField.unit` が両方あって (別名を正規化したあとも) 一致しない場合 (`"5000 V"` と `mA`、
   同一次元でも `"5000 V"` と `kV`) は、入力者の意図を決められないため自動反映せず
   `unclassified` にします (一致していれば、例えば `"5 kV"` と `kV` は正常値です)。
 - **換算できない値**: 異なる次元の単位 (例: 電圧に対し `"200 mA"`)、未知の単位、
@@ -600,15 +603,24 @@ MaiMLでは各STEPがmaterial/condition/resultを持ち、直列に接続する�
 Step単位の構造化されたmaterial/result情報が無いため (`body`の自由記述テキストのみ)、
 以下の既定パターンで機械的に接続しています:
 
-| STEP | 入力 | 出力 (resultTemplate) | 汎用データコンテナ |
-| --- | --- | --- | --- |
-| 最初のSTEP (R1) | `materialTemplate`(M1) + `conditionTemplate`(C1) | `templateRef`でM1を参照 | なし (実データはM1側に既にある) |
-| 途中のSTEP (Ri) | 直前の結果 (R1) | `templateRef`でR1を参照 | なし (参照先から自動継承) |
-| 最後のSTEP (Rn) | 直前のSTEPの結果 (R{n-1}) | `templateRef`で直前のresultTemplateを参照 | あり (実験本文/タグ/添付ファイル) |
+MaiMLでは、materialTemplate / conditionTemplate と各STEPのresultTemplateの工程上の関係を、
+PNMLのplace/transition/arc、および各Templateの`placeRef`で表現します。
+`resultTemplate.templateRef`は **resultTemplate間の継承・参照にのみ**使い、
+materialTemplateを`templateRef`で参照することはありません (最初のresultTemplateは
+materialTemplateを`templateRef`で参照しません)。
 
-`data/results` 内の `material`/`condition`/`result` インスタンスも、`instanceRef` で同じ接続パターンを反映します
-(`templateRef`のインスタンス層版)。1 STEPのみの実験ではこの連鎖は発生せず、単純に
-M1→R1(templateRef)という1段の参照になります。
+| STEP | 入力 | resultTemplateの参照 | 実データ |
+| --- | --- | --- | --- |
+| 最初のSTEP (R1) | `materialTemplate`(M1) + `conditionTemplate`(C1) をPNML/`placeRef`で入力 | `templateRef`なし | 対応するResultDataがあれば保持 |
+| 途中のSTEP (Ri) | 直前STEPの出力place | `templateRef`でR1を参照 | 対応するResultDataがあれば保持 |
+| 最後のSTEP (Rn) | 直前STEPの出力place | `templateRef`で直前のresultTemplateを参照 | `step_id`未指定のResultData (実験本文/タグ/添付ファイル) を既定で割当 |
+
+`data/results` 内の `material`/`condition`/`result` インスタンスも、原則として
+`templateRef`は同種のtemplate間、`instanceRef`は同種のinstance間の参照として扱います
+(最初のResultインスタンスがMaterialインスタンスを`instanceRef`で直接参照することはありません。
+material/result間の工程接続はPNML/`placeRef`で表します)。1 STEPのみの実験では、
+material/conditionがPNML/`placeRef`でSTEP1に入力され、その出力がR1になります
+(`R1.templateRef`はありません)。
 
 **制約**: 途中で新しい試料 (別material) を追加する分岐フローは、eLabFTW側にSTEP単位の
 構造化情報が無いため自動判定できません。そのような実験がある場合は、生成後のXMLを

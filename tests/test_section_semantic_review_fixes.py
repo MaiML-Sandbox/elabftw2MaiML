@@ -562,3 +562,69 @@ class TestCustomFieldAndFreeTextConflict:
         exp = ExperimentData(elab_id=1, title="t", date=None, body_text="観察\n加速電圧 10 kV")
         report = pipeline().interpret_experiment(exp, structured_candidates=structured)
         assert report.conflicts == []
+
+
+# ---------------------------------------------------------------------------
+# Custom Field にも Semantic Mapping の unit_aliases を適用する
+# ---------------------------------------------------------------------------
+
+from elabftw2maiml.interpretation.normalize import normalize_unit_alias  # noqa: E402
+
+
+class TestCustomFieldUnitAliases:
+    @pytest.mark.parametrize("value", ["5 KV", "5 kv"])
+    def test_semantic_alias_on_voltage(self, value):
+        # KV / kv は units.py の単位表には無く、sem_tem_v2 の unit_aliases (kV: [KV, kv]) だけが解決する
+        # (KV は kV の別表記であって V ではないので、5 KV は 5 kV。5000 には換算されない)
+        c = cf("加速電圧", value)
+        assert (c.value, c.unit, c.role) == (5, "kV", "condition")
+
+    def test_same_unit_after_alias_is_not_a_mismatch(self):
+        c = cf("加速電圧", "5 KV", "kV")
+        assert (c.value, c.unit, c.role) == (5, "kV", "condition")
+        c = cf("加速電圧", 5, "KV")
+        assert (c.value, c.unit) == (5, "kV")
+
+    def test_aliased_mismatch_is_still_rejected(self):
+        c = cf("加速電圧", "5000 V", "KV")
+        assert c.role is None and "一致しない" in c.reason
+
+    def test_micro_sign_variants_length(self):
+        for text in ("1.2 μm", "1.2 µm", "1.2 um"):
+            c = cf("Particle Size", text)
+            assert (c.value, c.unit) == (1200, "nm"), text
+
+    def test_micro_sign_variants_current(self):
+        for text in ("0.002 μA", "0.002 µA", "0.002 uA"):
+            c = cf("Probe Current", text)
+            assert (c.value, c.unit, c.role) == (2000, "pA", "condition"), text
+
+    def test_custom_field_and_free_text_agree_on_aliased_unit(self):
+        # 自由記述の "5 KV" と Custom Field の "5 KV" が同じ 5 kV になる
+        free = [c for c in pipeline().interpret_experiment(
+            ExperimentData(elab_id=1, title="t", date=None, body_text="観察\n加速電圧 5 KV"),
+        ).candidates if c.semantic_type == "accelerating_voltage"]
+        assert (free[0].value, free[0].unit) == (5, "kV")
+        cfv = cf("加速電圧", "5 KV")
+        assert (cfv.value, cfv.unit) == (free[0].value, free[0].unit)
+
+    def test_field_rule_carries_unit_aliases(self):
+        rule = FM.lookup("加速電圧")
+        assert ("KV", "kV") in rule.unit_aliases
+
+
+class TestNormalizeUnitAlias:
+    def test_global_then_semantic(self):
+        assert normalize_unit_alias("μm", (("um", "um"),), "nm") == "um"
+        assert normalize_unit_alias("KV", (("KV", "kV"),), "kV") == "kV"
+
+    def test_case_insensitive_fallback_and_unknown_passthrough(self):
+        assert normalize_unit_alias("kv", (("KV", "kV"),), "kV") == "kV"
+        assert normalize_unit_alias("furlong", (), "kV") == "furlong"
+
+    def test_none_and_blank(self):
+        assert normalize_unit_alias(None) is None and normalize_unit_alias("  ") is None
+
+    def test_semantic_rule_uses_the_same_function(self):
+        rule = SemanticMapping.from_yaml_file(str(SEM_TEM_V2)).rules["accelerating_voltage"]
+        assert rule.normalize_unit("KV") == "kV" and rule.normalize_unit(None) == "kV"

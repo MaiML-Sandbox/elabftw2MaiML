@@ -41,6 +41,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Mapping, Optional, Tuple
 
 from .field_mapping import FieldMapping, FieldRule
+from .normalize import normalize_unit_alias
 from .units import DIMENSIONS, units_of
 
 # 設計 5節: role / target の許可値。
@@ -113,16 +114,7 @@ class SemanticRule:
         (固定単位) を返す。"""
         if raw_unit is None:
             return self.unit
-        table: Dict[str, str] = {}
-        if self.unit:
-            table[self.unit] = self.unit
-        for raw, norm in self.unit_aliases:
-            table[raw] = norm
-            table.setdefault(norm, norm)
-        if raw_unit in table:
-            return table[raw_unit]
-        folded = {k.lower(): v for k, v in table.items()}
-        return folded.get(raw_unit.lower(), raw_unit)
+        return normalize_unit_alias(raw_unit, self.unit_aliases, self.unit)
 
 
 class SemanticMapping:
@@ -307,6 +299,7 @@ class SemanticMapping:
                 target=rule.target,
                 unit=rule.standard_unit,
                 dimension=rule.dimension,
+                unit_aliases=rule.unit_aliases,
                 context=rule.context,
                 data_type=rule.data_type,
                 required=rule.required,
