@@ -23,10 +23,11 @@ Phase 5-3、elabftw2MaiML_phase5_design.md 13節)。
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, List, Optional, Sequence
 
 from .conflict import Conflict, InterpretationCandidate, detect_conflicts
+from .normalize import canonical_unit
 from .policy import candidate_from_extracted_value
 from .text import TextRuleInterpreter
 
@@ -114,6 +115,7 @@ class InterpretationPipeline:
         text_interpreter: Optional[TextRuleInterpreter] = None,
         confidence_threshold: float = 1.0,
         extra_text_interpreters: Optional[Sequence[Any]] = None,
+        field_mapping: Optional[Any] = None,
     ):
         """
         extra_text_interpreters:
@@ -124,10 +126,40 @@ class InterpretationPipeline:
             拡張ポイント (「SEM_TEM_field_mapping_example.md」7節で議論した
             「汎用InterpreterとSEM/TEM固有ルールを分離する」構成に対応)。
             省略時 (None) は既存と全く同じ挙動 (`text_interpreter`のみ)。
+        field_mapping:
+            `FieldMapping` (`lookup_semantic_type()` を持つオブジェクト)。指定すると、
+            自由記述由来で `role`/`target` が未確定の候補に、`semantic_type` を
+            キーにこの対応表の `role`/`target` を補完する (外部化設計 3節・7節)。
+            Custom Fieldと自由記述が、同じ semantic_type から同じ role/target に
+            到達するための仕組み。補完は、抽出器が既に設定した値を上書きせず、
+            対応表の期待単位と次元が異なる候補 (例: 期待kVに対し mA) には
+            行わない。省略時 (None) は補完しない (従来通り)。
         """
         self._text_interpreter = text_interpreter or TextRuleInterpreter()
         self._extra_text_interpreters = list(extra_text_interpreters) if extra_text_interpreters else []
+        self._field_mapping = field_mapping
         self.confidence_threshold = confidence_threshold
+
+    def _complete_from_mapping(self, candidate: InterpretationCandidate) -> InterpretationCandidate:
+        """role/targetが未確定の自由記述候補を、semantic_typeをキーに対応表から補完する。"""
+        if self._field_mapping is None:
+            return candidate
+        if candidate.role is not None and candidate.target is not None:
+            return candidate
+        rule = self._field_mapping.lookup_semantic_type(candidate.semantic_type)
+        if rule is None:
+            return candidate
+        if (
+            rule.unit is not None
+            and candidate.unit is not None
+            and canonical_unit(rule.unit) != canonical_unit(candidate.unit)
+        ):
+            return candidate
+        return replace(
+            candidate,
+            role=candidate.role if candidate.role is not None else rule.role,
+            target=candidate.target if candidate.target is not None else rule.target,
+        )
 
     def free_text_candidates(self, exp) -> List[InterpretationCandidate]:
         """実験本文 (`exp.body_text`, context="experiment") と各Step本文
@@ -145,9 +177,9 @@ class InterpretationPipeline:
         if exp.body_text:
             for interpreter in interpreters:
                 for extracted in interpreter.extract(exp.body_text):
-                    candidates.append(
+                    candidates.append(self._complete_from_mapping(
                         candidate_from_extracted_value(extracted, context=EXPERIMENT_CONTEXT)
-                    )
+                    ))
 
         for step in exp.steps or []:
             body = getattr(step, "body", None)
@@ -156,7 +188,8 @@ class InterpretationPipeline:
             context = step_context(step.elab_id)
             for interpreter in interpreters:
                 for extracted in interpreter.extract(body):
-                    candidates.append(candidate_from_extracted_value(extracted, context=context))
+                    candidates.append(self._complete_from_mapping(
+                        candidate_from_extracted_value(extracted, context=context)))
 
         return candidates
 

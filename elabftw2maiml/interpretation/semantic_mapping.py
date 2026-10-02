@@ -253,14 +253,16 @@ class SemanticMapping:
         `build_structured_candidates` / `find_missing_required_fields`) へ
         そのまま渡せる `FieldMapping` を生成する。
 
-        `fields` を持つルールだけが対象。先頭の field 名を主キー、残りを
-        alias として登録する。"""
+        `fields` を持つルールは、先頭の field 名を主キー、残りを alias として
+        登録する。`fields` を持たないルールは Custom Field の引き当て対象には
+        ならないが、`semantic_type` からの引き当て
+        (`FieldMapping.lookup_semantic_type()`) には登録する。これにより
+        自由記述の値 (汎用抽出の温度・時間など) にも `role`/`target` を
+        補完できる。"""
         rules: Dict[str, FieldRule] = {}
+        semantic_only: List[FieldRule] = []
         for rule in self._rules.values():
-            if not rule.fields:
-                continue
-            primary, *aliases = [f.strip() for f in rule.fields]
-            rules[primary] = FieldRule(
+            field_rule_kwargs = dict(
                 semantic_type=rule.semantic_type,
                 role=rule.role,
                 target=rule.target,
@@ -268,9 +270,13 @@ class SemanticMapping:
                 context=rule.context,
                 data_type=rule.data_type,
                 required=rule.required,
-                aliases=tuple(aliases),
             )
-        return FieldMapping(rules)
+            if not rule.fields:
+                semantic_only.append(FieldRule(**field_rule_kwargs))
+                continue
+            primary, *aliases = [f.strip() for f in rule.fields]
+            rules[primary] = FieldRule(aliases=tuple(aliases), **field_rule_kwargs)
+        return FieldMapping(rules, semantic_only_rules=semantic_only)
 
 
 _ALLOWED_KEYS = {

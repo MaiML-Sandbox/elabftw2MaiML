@@ -305,6 +305,26 @@ semantic_typeに定義することはできません。単位だけの表現 ("5
 SEM/TEMの8種の抽出パターンを加えたものです (出力は
 `SemTemTextRuleInterpreter` と一致することをテストで確認しています)。
 
+**自由記述への role/target の補完 (semantic_type をキーに対応表を参照)**:
+`InterpretationPipeline(field_mapping=...)` (CLIの `--field-mapping` 指定時は自動で渡される) は、
+自由記述から抽出した値のうち `role`/`target` が未確定のものに、`semantic_type`
+をキーに対応表の `role`/`target` を補完します。汎用抽出 (温度・時間・質量など) の値も
+対象です。version 2 では `fields`/`patterns` を持たない定義でも使えます。
+
+```yaml
+semantic_types:
+  temperature:                  # 自由記述の「4℃」等に role/target を与えるだけの定義
+    role: condition
+    target: conditions
+    unit: degC
+    data_type: number
+```
+
+補完は、抽出器が既に設定した値を上書きせず、対応表の `unit` と単位が一致しない候補
+(例: 期待 `min` に対し `h`) には行いません (換算はしないため)。version 1 の対応表でも、
+`semantic_type` が定義されていれば同様に補完されます。自動反映の条件
+(`--confidence-threshold`・競合なし・context確定) は従来どおりです。
+
 注意: Custom Fieldの候補のcontextは対応表の `context` (未指定ならNone)、
 自由記述の候補のcontextは原文の位置 (`experiment`/`step:<id>`) です。競合判定は
 `(semantic_type, context, role, target)` 単位なので、両者を突き合わせたい場合は

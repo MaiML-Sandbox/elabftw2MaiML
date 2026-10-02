@@ -152,6 +152,7 @@ def main() -> int:
 
         pipeline = InterpretationPipeline(
             extra_text_interpreters=loaded_mapping.text_interpreters,
+            field_mapping=field_mapping,
             confidence_threshold=args.confidence_threshold,
         )
         report = pipeline.interpret_experiment(exp_data, structured_candidates=structured_candidates)

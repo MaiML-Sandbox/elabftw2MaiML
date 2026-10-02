@@ -350,3 +350,99 @@ class TestVersionDispatch:
         p.write_text("version: 3\nsemantic_types: {}\n", encoding="utf-8")
         with pytest.raises(SemanticMappingError, match="version"):
             load_mapping_file(str(p))
+
+
+# ---------------------------------------------------------------------------
+# semantic_type をキーにした role/target の補完 (パイプライン側)
+# ---------------------------------------------------------------------------
+
+_V2_WITH_GENERIC_TYPES = {
+    "version": 2,
+    "semantic_types": {
+        # fields/patterns を持たず、汎用抽出 (TextRuleInterpreter) の値にrole/targetを
+        # 与えるためだけの定義
+        "temperature": {
+            "role": "condition", "target": "conditions", "unit": "degC",
+            "data_type": "number",
+        },
+        "duration": {
+            "role": "condition", "target": "conditions", "unit": "min",
+            "data_type": "number",
+        },
+    },
+}
+
+
+class TestCompletionFromMappingBySemanticType:
+    def _run(self, body, mapping_dict, threshold=0.95, **kw):
+        fm = SemanticMapping.from_dict(mapping_dict).to_field_mapping()
+        exp = ExperimentData(elab_id=1, title="t", date=None, body_text=body)
+        pipeline = InterpretationPipeline(
+            confidence_threshold=threshold, field_mapping=fm, **kw)
+        return exp, pipeline.interpret_experiment(exp)
+
+    def test_generic_interpreter_value_gets_role_target_and_is_accepted(self):
+        _exp, report = self._run("@4℃で保存", _V2_WITH_GENERIC_TYPES)
+        (c,) = [c for c in report.accepted if c.semantic_type == "temperature"]
+        assert (c.value, c.unit, c.role, c.target) == (4, "degC", "condition", "conditions")
+        assert c.source == "free_text_regex"
+
+    def test_threshold_still_gates_completed_candidates(self):
+        _exp, report = self._run("@4℃で保存", _V2_WITH_GENERIC_TYPES, threshold=1.0)
+        assert report.accepted == []
+        (c,) = report.unclassified
+        assert (c.role, c.target) == ("condition", "conditions")
+
+    def test_without_field_mapping_nothing_is_completed(self):
+        exp = ExperimentData(elab_id=1, title="t", date=None, body_text="@4℃で保存")
+        report = InterpretationPipeline(confidence_threshold=0.95).interpret_experiment(exp)
+        assert report.accepted == []
+
+    def test_semantic_type_not_in_mapping_stays_unclassified(self):
+        _exp, report = self._run("30 mgを秤量", _V2_WITH_GENERIC_TYPES)
+        assert report.accepted == []
+        assert [c.semantic_type for c in report.unclassified] == ["mass"]
+
+    def test_unit_dimension_mismatch_is_not_completed(self):
+        # 対応表は duration を min と定義。"2 h" は次元の表記が異なるため補完しない
+        _exp, report = self._run("2 h 乾燥", _V2_WITH_GENERIC_TYPES)
+        assert report.accepted == []
+        assert [c.semantic_type for c in report.unclassified] == ["duration"]
+
+    def test_extractor_supplied_role_is_not_overwritten(self):
+        data = {
+            "version": 2,
+            "semantic_types": {
+                "accelerating_voltage": {
+                    **BASE["semantic_types"]["accelerating_voltage"],
+                    "role": "condition",
+                },
+            },
+        }
+        fm = SemanticMapping.from_dict(data).to_field_mapping()
+        # 抽出器 (patterns) が付けたrole/targetは、対応表の補完で変わらない
+        exp = ExperimentData(elab_id=1, title="t", date=None, body_text="加速電圧 5 kV")
+        interp = ConfiguredTextRuleInterpreter(SemanticMapping.from_dict(data))
+        report = InterpretationPipeline(
+            confidence_threshold=0.95, field_mapping=fm,
+            extra_text_interpreters=[interp]).interpret_experiment(exp)
+        (c,) = [c for c in report.accepted if c.semantic_type == "accelerating_voltage"]
+        assert (c.role, c.target) == ("condition", "conditions")
+
+    def test_v1_mapping_also_completes_free_text(self):
+        # version 1 の対応表でも、semantic_typeが定義されていれば補完される
+        loaded = load_mapping_file(str(BUNDLED_V1))
+        exp = ExperimentData(elab_id=1, title="t", date=None,
+                             body_text="加速電圧 5 kVで観察。")
+        report = InterpretationPipeline(
+            confidence_threshold=0.95, field_mapping=loaded.field_mapping,
+            extra_text_interpreters=loaded.text_interpreters).interpret_experiment(exp)
+        (c,) = [c for c in report.candidates if c.semantic_type == "accelerating_voltage"]
+        assert (c.role, c.target) == ("condition", "conditions")
+        # context は自由記述の位置 ("experiment") なので、自動反映条件を満たす
+        assert c in report.accepted
+
+    def test_semantic_only_rule_is_not_a_custom_field_name(self):
+        fm = SemanticMapping.from_dict(_V2_WITH_GENERIC_TYPES).to_field_mapping()
+        assert fm.lookup("temperature") is None
+        assert fm.lookup_semantic_type("temperature").role == "condition"

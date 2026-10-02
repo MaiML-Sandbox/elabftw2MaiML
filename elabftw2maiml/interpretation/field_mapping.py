@@ -82,18 +82,35 @@ class FieldMapping:
             required: true
     """
 
-    def __init__(self, rules: Dict[str, FieldRule]):
+    def __init__(
+        self,
+        rules: Dict[str, FieldRule],
+        semantic_only_rules: Sequence[FieldRule] = (),
+    ):
+        """
+        semantic_only_rules:
+            Custom Field名を持たず、`semantic_type` からの引き当て
+            (`lookup_semantic_type()`) だけに使うルール (version 2 対応表で
+            `fields` を定義していない semantic_type)。`lookup()` の対象には
+            ならない。
+        """
         # 表引きは正規化した名前 (前後空白除去) で行う。大文字小文字は区別する
         # (日本語フィールド名が主で、英字aliasも大文字小文字が意味を持ちうるため)。
         self._by_name: Dict[str, FieldRule] = {}
+        self._by_semantic_type: Dict[str, FieldRule] = {}
         for name, rule in rules.items():
             self._register(name, rule)
+        for rule in semantic_only_rules:
+            self._by_semantic_type.setdefault(rule.semantic_type, rule)
 
     def _register(self, name: str, rule: FieldRule) -> None:
         key = name.strip()
         self._by_name[key] = rule
         for alias in rule.aliases:
             self._by_name[alias.strip()] = rule
+        # 同じsemantic_typeを複数のフィールドが持つ場合は、最初に登録されたものを
+        # 採用する (自由記述候補へのrole/target補完用。`lookup_semantic_type()`)。
+        self._by_semantic_type.setdefault(rule.semantic_type, rule)
 
     @classmethod
     def from_dict(cls, data: dict) -> "FieldMapping":
@@ -136,6 +153,14 @@ class FieldMapping:
     def lookup(self, field_name: str) -> Optional[FieldRule]:
         """フィールド名 (またはalias) から `FieldRule` を引く。未定義なら None。"""
         return self._by_name.get(field_name.strip())
+
+    def lookup_semantic_type(self, semantic_type: str) -> Optional[FieldRule]:
+        """`semantic_type` から `FieldRule` を引く (Custom Field名を介さない)。
+
+        自由記述から抽出した値は Custom Field名を持たないため、
+        `semantic_type` をキーにこの対応表の `role`/`target` を補完する
+        (`InterpretationPipeline` の `field_mapping` 引数)。未定義なら None。"""
+        return self._by_semantic_type.get(semantic_type)
 
     def __contains__(self, field_name: str) -> bool:
         return self.lookup(field_name) is not None

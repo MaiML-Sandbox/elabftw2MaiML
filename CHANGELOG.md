@@ -21,6 +21,10 @@ All notable changes to this project are documented in this file.
     自動反映できる。
   - 同梱の `field_mappings/sem_tem_v2.yaml` (SEM/TEM 8種の抽出パターンをPythonから
     YAMLへ移行。`SemTemTextRuleInterpreter` と出力が一致することをテストで確認)。
+  - `InterpretationPipeline(field_mapping=...)` を追加。自由記述由来で
+    `role`/`target` が未確定の候補に、`semantic_type` をキーに対応表の値を補完する
+    (汎用抽出の温度・時間などにも有効。v1/v2 共通。単位が対応表と一致しない候補・
+    抽出器が設定済みの値は補完しない)。`FieldMapping.lookup_semantic_type()` を追加。
   - `--field-mapping` は `version` で読み分ける。`version: 1` のYAMLと
     `SemTemTextRuleInterpreter` は従来通り動作する (後方互換)。
 
