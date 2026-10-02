@@ -1,0 +1,39 @@
+細胞培養 in KK2　
+カーボンコートしたスライドガラスに細胞を播種。
+細胞：Ax2, mhcAKO　
+細胞濃度：1.5~1.8 x 107 cells/mL
+培養時間：約11時間　ストリーム形成　遅れているものもあり。
+前固定
+1% PFA, 0.1% GA in KK2 
+incubate: 20 min @4℃
+GAの濃度、低くても良かったかも。0.05%や0.01%.
+洗浄
+KK2 on ice
+３回　次々と溶液を入れ換えする。
+除膜
+0.1% TritonX-100 in KK2 @RT 30 min
+0.5% TritonX-100 in KK2 @RT 30 min
+洗浄
+KK2 ＠RT
+３回　次々と溶液を入れ換えする。
+固定1
+2.5% GA in KK2 on ice 20 min
+洗浄
+KK2 on ice　次々と溶液を入れ換え。
+固定2
+0.5% OsO4 in KK2  on ice, 5 min
+洗浄
+milliQ on ice
+3回　次々と溶液を入れ換え。
+脱水
+30% EtOH on ice, 5 min
+50% EtOH on ice, 10 min
+70% EtOH on ice, 10 min
+90% EtOH @RT, 10 min
+100% EtOH @RT, 5 minx2
+置換
+t-butyl Alcohol @RT, 15 minx2
+凍結
+t-butyl Alcohol　冷蔵庫
+乾燥
+真空蒸着機でt-butyl alcoholを飛ばす。

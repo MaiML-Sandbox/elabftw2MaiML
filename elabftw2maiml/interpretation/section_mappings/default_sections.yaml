@@ -1,0 +1,39 @@
+# 実験本文の見出し -> section_type の既定辞書
+# (elabftw2MaiML_section_detection_classification_design.md 「Section Mapping YAML」)。
+#
+# 見出しは正規化 (全角/半角統一・小文字化・末尾コロン除去・空白/ハイフン無視・
+# 末尾の連番除去) した上で比較する。例: 「固定1」「Pre Fixation」「前固定：」は
+# それぞれ「固定」「pre-fixation」「前固定」と同じ扱いになる。
+# 辞書に無い見出しは section_type=unknown として本文ごと保持され、変換時のレポートに
+# 「未知のセクション」として表示される。そこで見つかった見出しをここへ追加して
+# 辞書を育てる。研究室・ユーザー独自の見出しは、このファイルをコピーして書き足す。
+#
+# section_type は文書構造上の大分類であり、MaiMLのrole (material/condition/...) とは別概念。
+
+version: 1
+
+section_types:
+  material:
+    headings: [試料, サンプル, sample, specimen]
+  culture:
+    headings: [培養, 細胞培養, culture, cell culture]
+  fixation:
+    headings: [固定, 前固定, 本固定, fixation, pre-fixation]
+  washing:
+    headings: [洗浄, wash, washing]
+  permeabilization:
+    headings: [除膜, permeabilization]
+  dehydration:
+    headings: [脱水, dehydration]
+  substitution:
+    headings: [置換, substitution]
+  freezing:
+    headings: [凍結, freezing]
+  drying:
+    headings: [乾燥, drying]
+  observation:
+    headings: [観察, SEM観察, TEM観察, microscopy, observation]
+  result:
+    headings: [結果, result, results]
+  note:
+    headings: [考察, メモ, note, comment]

@@ -81,10 +81,20 @@ def main() -> int:
                               "閾値 (既定値: 1.0)。自由記述からの抽出候補は既定でconfidence=0.95に"
                               "なるため、1.0のままだと自由記述側は (構造化フィールドと一致していても)"
                               "常にunclassifiedへの参考情報として残るだけになる")
+    parser.add_argument("--section-mapping", default=None, metavar="PATH",
+                         help="[任意・--field-mapping指定時のみ有効] 実験本文の見出し -> section_type の"
+                              "辞書YAML (elabftw2maiml/interpretation/section_mappings/default_sections.yaml"
+                              "が書式の例)。指定すると、実験本文を見出しでセクションに分割・分類し、"
+                              "セクションごとに値を抽出する (context=section:<種別>:<連番>)。"
+                              "異なる工程の同種の値 (例: 20分と30分) が不要な競合になるのを避けられる。"
+                              "辞書に無い見出しは未知のセクションとして本文ごと保持され、"
+                              "レポートに表示される。省略時は従来通り実験本文全体を1つとして扱う")
     args = parser.parse_args()
 
     if not args.host or not args.api_key:
         parser.error("--host/--api-key (または環境変数 ELABFTW_HOST/ELABFTW_API_KEY) が必要です")
+    if args.section_mapping and not args.field_mapping:
+        parser.error("--section-mapping は --field-mapping と一緒に指定してください")
 
     def _parse_role_candidates(items, legacy_instrument_items):
         """'ROLE=VALUE' 形式の引数リストを {role: [value, ...]} にまとめる。
@@ -150,12 +160,28 @@ def main() -> int:
             raw_fields, field_mapping, source="custom_field")
         missing_required_fields = find_missing_required_fields(raw_fields, field_mapping)
 
+        section_kwargs = {}
+        structured_body = None
+        if args.section_mapping:
+            from elabftw2maiml.interpretation import (
+                SectionMapping, SectionDetector, SectionClassifier,
+            )
+            section_mapping = SectionMapping.from_yaml_file(args.section_mapping)
+            section_kwargs = dict(
+                section_detector=SectionDetector(section_mapping),
+                section_classifier=SectionClassifier(section_mapping),
+            )
+            # exp_data.body_text はHTML除去で改行が失われているため、構造付きの本文を取得する
+            structured_body = client.fetch_body_structured(args.experiment_id)
+
         pipeline = InterpretationPipeline(
             extra_text_interpreters=loaded_mapping.text_interpreters,
             field_mapping=field_mapping,
             confidence_threshold=args.confidence_threshold,
+            **section_kwargs,
         )
-        report = pipeline.interpret_experiment(exp_data, structured_candidates=structured_candidates)
+        report = pipeline.interpret_experiment(
+            exp_data, structured_candidates=structured_candidates, body_text=structured_body)
         apply_logs = apply_interpretation_report(exp_data, report, ns_prefix=args.ns_prefix)
 
         print("\n--- 対応表 (--field-mapping) による解釈結果 -----------------------------")

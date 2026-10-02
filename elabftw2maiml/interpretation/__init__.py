@@ -43,6 +43,16 @@ from .semantic_mapping import (
     load_mapping_file,
 )
 from .configured_text import ConfiguredTextRuleInterpreter
+from .sections import (
+    TextSection,
+    SectionRule,
+    SectionMapping,
+    SectionMappingError,
+    SectionDetector,
+    SectionClassifier,
+    html_to_structured_text,
+    UNKNOWN_SECTION_TYPE,
+)
 from .apply import apply_interpretation_report
 from .normalize import NormalizedValue, parse_numeric_with_unit, canonical_unit
 
@@ -83,6 +93,14 @@ __all__ = [
     "LoadedMapping",
     "load_mapping_file",
     "ConfiguredTextRuleInterpreter",
+    "TextSection",
+    "SectionRule",
+    "SectionMapping",
+    "SectionMappingError",
+    "SectionDetector",
+    "SectionClassifier",
+    "html_to_structured_text",
+    "UNKNOWN_SECTION_TYPE",
     "apply_interpretation_report",
     "NormalizedValue",
     "parse_numeric_with_unit",

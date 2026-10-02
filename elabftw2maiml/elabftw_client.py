@@ -23,6 +23,7 @@ import elabapi_python
 from elabapi_python.rest import ApiException
 
 from .model import ConditionData, ExperimentData, FileRef, MaterialData, Party, PropertyValue, ResultData, Step
+from .interpretation.sections import html_to_structured_text
 from .interpretation import (
     StructuredRuleInterpreter,
     DEFAULT_ROLE_CATEGORY_CANDIDATES,
@@ -497,6 +498,17 @@ class ElabftwClient:
         raw_experiment = self._get_raw_json(f"/experiments/{experiment_id}")
         raw_metadata = raw_experiment.get("metadata") if raw_experiment else None
         return raw_fields_from_metadata(raw_metadata)
+
+    def fetch_body_structured(self, experiment_id: int) -> Optional[str]:
+        """実験本文を、行・段落・見出しの構造を保ったテキストとして取得する
+        (`interpretation.sections.html_to_structured_text()`)。
+
+        `fetch_experiment()` の `body_text` は `_strip_html()` により改行が失われるため、
+        セクション分割 (`--section-mapping`) にはこちらを使う。本文が無ければ None。
+        """
+        raw_experiment = self._get_raw_json(f"/experiments/{experiment_id}")
+        body = raw_experiment.get("body") if raw_experiment else None
+        return html_to_structured_text(body)
 
     def fetch_experiment(self, experiment_id: int, ns_prefix: str = "ns1",
                           creator_field_candidates: Optional[list] = None,

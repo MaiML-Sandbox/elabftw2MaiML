@@ -6,6 +6,18 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- **実験本文のセクション分割・分類** (`elabftw2MaiML_section_detection_classification_design.md`
+  Phase A〜D)。`--section-mapping` (`--field-mapping` 指定時のみ) で、実験本文を見出しごとに
+  分割・分類し、候補の context を `section:<section_type>:<連番>` にする。
+  - `interpretation/sections.py` (`TextSection`/`SectionMapping`/`SectionDetector`/
+    `SectionClassifier`/`html_to_structured_text`) と `section_mappings/default_sections.yaml`。
+  - 辞書に無い見出しは `unknown` として本文ごと保持し、レポートに「未知のセクション」を表示。
+  - `note` 型セクションの値は自動反映の対象外 (`excluded_section_types`)。
+  - `InterpretationPipeline` に `section_detector`/`section_classifier`、
+    `interpret_experiment()` に `body_text` 引数を追加。`ElabftwClient.fetch_body_structured()`
+    を追加 (`body_text` はHTML除去で改行が失われるため)。`--section-mapping` を指定しない
+    場合の挙動は変わらない。
+  - 未実装: Statement分割・考察文の分類・Operation Interpreter。
 - **Semantic Mapping (対応表 version 2)** (`elabftw2MaiML_semantic_mapping_externalization_design.md`)。
   `semantic_type` を軸に、Custom Field名 (`fields`)・自由記述の抽出正規表現
   (`patterns`)・`role`/`target`/`unit` を1か所で定義できるようにした。

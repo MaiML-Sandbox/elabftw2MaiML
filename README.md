@@ -97,6 +97,10 @@ elabftw2maiml/
     semantic_mapping.py     SemanticRule/SemanticMapping/load_mapping_file (version 2 対応表:
                           semantic_typeを中心に fields/patterns/role/target/unit を1か所で定義。
                           読み込み時に正規表現・role・target等を検証する)
+    sections.py             TextSection/SectionMapping/SectionDetector/SectionClassifier (実験本文を
+                          見出しで分割し section_type へ分類する。context=section:<種別>:<連番>)
+    section_mappings/
+      default_sections.yaml 見出し -> section_type の既定辞書
     configured_text.py      ConfiguredTextRuleInterpreter (version 2 のpatternsから自由記述を抽出し、
                           SemanticRuleのrole/targetを付与する設定駆動のInterpreter)
     field_mappings/
@@ -330,6 +334,52 @@ semantic_types:
 `(semantic_type, context, role, target)` 単位なので、両者を突き合わせたい場合は
 Custom Field側の `context` を `experiment` などに合わせてください。
 
+### 実験本文のセクション分割・分類 (`--section-mapping`)
+
+実験本文に「試料」「前固定」「洗浄」のような見出しで工程が書かれている場合、本文全体を
+1つ (`context=experiment`) として扱うと、異なる工程の同種の値 (「20分」と「30分」) が
+同じ context に集まって不要な競合になり、自動反映されません。`--field-mapping` と一緒に
+`--section-mapping` を指定すると、本文を見出しごとのセクションに分けて解釈します
+(設計: `elabftw2MaiML_section_detection_classification_design.md`)。
+
+```bash
+python elabftw_to_maiml.py ... \
+    --field-mapping my_mapping.yaml \
+    --section-mapping elabftw2maiml/interpretation/section_mappings/default_sections.yaml \
+    --confidence-threshold 0.95
+```
+
+処理は3段階に分かれており、「見出しかどうか」と「その見出しの意味」は別処理です。
+
+1. **検出** (`SectionDetector`): 既知の見出し辞書への一致・太字/Markdown見出し・短い独立行
+   (直前が空行) などのスコアで見出しを判定して分割する。空行の無い本文でも、辞書にある
+   見出し (前固定・洗浄 など) で分割できる。「KK2 on ice」のような短い値の行は、辞書に無く
+   空行も無ければ見出しにならない。
+2. **分類** (`SectionClassifier`): `section_mappings/*.yaml` の `headings` で、見出しを
+   `section_type` (material/culture/fixation/washing/...) へ分類する。全角/半角・大文字小文字・
+   末尾コロン・空白/ハイフン・末尾の連番 (「固定1」) は正規化して比較する。辞書に無い見出しは
+   `unknown` として**本文ごと保持**し、変換レポートの「未知のセクション」に表示する
+   (そこで見つかった見出しをYAMLへ追加して辞書を育てる)。
+3. **値の抽出**: セクションごとに従来のInterpreterを実行し、候補の context を
+   `section:<section_type>:<同種の通し番号>` (例: `section:washing:2`) にする。
+   階層見出し (Markdownの `#`/`##`) は `section:a:1/b:1` のような path になる。
+
+`section_type` は文書構造上の分類であり、MaiMLの `role` とは別です (`role`/`target` は
+従来通り `semantic_type` から対応表で決まる)。見出しがセクションになるだけで、
+STEP や MaiML の transition は生成しません。STEP本文は従来通り `step:<id>` です。
+
+- **改行情報**: `fetch_experiment()` の `body_text` は HTML 除去時に改行が失われるため、
+  `--section-mapping` 指定時は `ElabftwClient.fetch_body_structured()` が本文を構造
+  (行・段落・見出し) 付きで再取得します。`--section-mapping` を指定しない場合の出力は変わりません。
+- **考察・メモの除外**: `note` 型のセクション (考察・メモ・コメント) の値は、抽出はしますが
+  `role`/`target` を外して `unclassified` に残します (「0.05%や0.01%」のような条件ではない
+  数値を誤反映しないため)。`InterpretationPipeline(excluded_section_types=...)` で変更できます。
+- **未対応 (今後)**: 1つのセクション内に値の異なる複数の処理がある場合 (例: 脱水の
+  5/10 min) は、依然として競合になります (Statement分割は未実装)。濃度・細胞濃度・
+  `minx2` 等の抽出ルール、`Operation Interpreter` も未実装です。
+- 研究室・ユーザー独自の見出しは、`default_sections.yaml` をコピーして `headings` を
+  書き足してください (Pythonコードの変更は不要)。
+
 ## テスト
 
 実際のeLabFTWサーバーに接続せず、合成 (synthetic) フィクスチャに対して
@@ -439,6 +489,9 @@ python -m pytest tests/
   `configured_text.py`) のYAML検証・Custom Field/自由記述の双方からのrole/target付与・
   `--confidence-threshold`による反映・競合検出・`SemTemTextRuleInterpreter`との出力等価性・
   version 1 YAMLの後方互換。
+- `tests/test_sections.py`: 実験本文のセクション分割・分類 (`sections.py`) の見出し検出・
+  正規化と分類・未知見出し・同名見出しの連番/階層path・パイプライン接続 (競合回避・note除外)・
+  実際の実験ノート (`note_cell_prep_sem.txt`)・CLI `--section-mapping`。
 - `tests/test_cli_field_mapping.py`: `elabftw_to_maiml.py`の`--field-mapping`
   オプション (Phase5-3のCLI統合) のテスト。ネットワークに接続せず
   `tests.fixtures`の合成データで`ElabftwClient`を差し替え、CLI全体が
