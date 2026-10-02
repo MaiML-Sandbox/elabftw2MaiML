@@ -92,4 +92,6 @@ def candidate_from_extracted_value(
         confidence=extracted.confidence * source_confidence,
         context=context,
         source_text=extracted.source_text,
+        role=extracted.role,
+        target=extracted.target,
     )

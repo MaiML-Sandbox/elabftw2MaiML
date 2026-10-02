@@ -1,0 +1,152 @@
+# SEM・TEM対応表 (version 2 / Semantic Mapping)。
+#
+# sem_tem_example.yaml (version 1) と同じCustom Fieldの対応に加え、これまで
+# Python (profiles/sem_tem.py) に固定されていた自由記述の抽出パターンを
+# `patterns` として外部化したもの (elabftw2MaiML_semantic_mapping_externalization_design.md)。
+# Custom Field由来でも自由記述由来でも、同じsemantic_typeのrole/target/unitが適用される。
+#
+# patternsの書き方 (読み込み時に検証される):
+#   - named group `(?P<value>...)` が必須、`(?P<unit>...)` は任意
+#     (unitグループが無いパターンは、このファイルの `unit` を固定単位として使う。例: 倍率の x)
+#   - 「意味キーワード + 数値 + 単位」の形にすること。"5 kV" のような単位だけの表現を
+#     拾うパターンは、意味を確定できず誤検出の原因になるため書かない
+#   - `unit_aliases` は `{正規化後の単位: [生の表記, ...]}`
+# 実運用ではeLabFTW上の実際のCustom Field名・記録ルールに合わせて調整すること。
+
+version: 2
+semantic_types:
+  sample_id:
+    role: material
+    target: materials
+    data_type: string
+    context: experiment
+    required: true
+    fields: [試料ID, Sample ID]
+  instrument_name:
+    role: instrument
+    target: instrument
+    data_type: string
+    required: true
+    fields: [装置名, Instrument Name]
+  accelerating_voltage:
+    role: condition
+    target: conditions
+    unit: kV
+    data_type: number
+    required: true
+    fields: [加速電圧, Acceleration Voltage, Accelerating Voltage, HV]
+    patterns: ['(?:加速電圧|HV)[^\d\n]{0,6}(?P<value>-?\d[\d,]*(?:\.\d+)?)\s*(?P<unit>kV|KV|kv|V)(?![A-Za-z])']
+    unit_aliases:
+      kV: [KV, kv]
+  imaging_mode:
+    role: condition
+    target: conditions
+    data_type: string
+    required: true
+    fields: [観察モード, Imaging Mode]
+  magnification:
+    role: condition
+    target: conditions
+    unit: x
+    data_type: number
+    required: true
+    fields: [倍率, Magnification]
+    patterns: ['倍率[^\d\n]{0,6}(?P<value>-?\d[\d,]*(?:\.\d+)?)\s*[倍×xX]?', '(?P<value>-?\d[\d,]*(?:\.\d+)?)\s*倍\s*(?:で|にて)\s*(?:観察|撮影|測定|確認)', '(?i:magnification)\s*[:：]?\s*(?P<value>-?\d[\d,]*(?:\.\d+)?)']
+  working_distance:
+    role: condition
+    target: conditions
+    unit: mm
+    data_type: number
+    context: sem_acquisition
+    fields: [ワーキングディスタンス, Working Distance, WD]
+    patterns: ['(?:作動距離|WD)[^\d\n]{0,6}(?P<value>-?\d[\d,]*(?:\.\d+)?)\s*(?P<unit>mm)(?![A-Za-z])']
+  detector_name:
+    role: instrument
+    target: instrument
+    data_type: string
+    context: sem_acquisition
+    required: true
+    fields: [検出器, Detector]
+  sem_image:
+    role: result
+    target: results
+    data_type: file
+    context: sem_acquisition
+    required: true
+    fields: [SEM画像, SEM Image]
+  particle_size:
+    role: result
+    target: results
+    unit: nm
+    data_type: number
+    fields: [粒径, Particle Size, Diameter]
+    patterns: ['(?:粒径|[Pp]article\s*[Ss]ize)[^\d\n]{0,6}(?P<value>-?\d[\d,]*(?:\.\d+)?)\s*(?P<unit>nm|µm|μm|um|mm)(?![A-Za-z])']
+    unit_aliases:
+      um: [µm, μm]
+  morphology_observation:
+    role: result
+    target: results
+    data_type: string
+    context: sem_analysis
+    fields: [表面形態所見, Morphology Observation]
+  tem_grid:
+    role: material
+    target: materials
+    data_type: string
+    context: sample_preparation
+    required: true
+    fields: [TEMグリッド, TEM Grid]
+  camera_length:
+    role: condition
+    target: conditions
+    unit: mm
+    data_type: number
+    context: tem_diffraction
+    fields: [カメラ長, Camera Length]
+    patterns: ['カメラ長[^\d\n]{0,6}(?P<value>-?\d[\d,]*(?:\.\d+)?)\s*(?P<unit>mm|cm|m)(?![A-Za-z])']
+  tem_image:
+    role: result
+    target: results
+    data_type: file
+    context: tem_acquisition
+    required: true
+    fields: [TEM画像, TEM Image]
+  diffraction_pattern:
+    role: result
+    target: results
+    data_type: file
+    context: tem_diffraction
+    fields: [回折像, Diffraction Pattern]
+  lattice_spacing:
+    role: result
+    target: results
+    unit: nm
+    data_type: number
+    context: tem_analysis
+    fields: [格子縞間隔, Lattice Spacing, d-spacing]
+    patterns: ['(?:格子縞間隔|格子縞|[Dd]-spacing|dスペーシング)[^\d\n]{0,6}(?P<value>-?\d[\d,]*(?:\.\d+)?)\s*(?P<unit>nm|Å|pm)(?![A-Za-z])']
+    unit_aliases:
+      angstrom: [Å]
+  crystal_phase:
+    role: result
+    target: results
+    data_type: string
+    context: tem_analysis
+    fields: [結晶相, Crystal Phase]
+  # --- Custom Fieldの定義が無く、自由記述からのみ抽出するsemantic_type ---
+  probe_current:
+    role: condition
+    target: conditions
+    unit: pA
+    data_type: number
+    patterns: ['(?:プローブ電流|ビーム電流|照射電流)[^\d\n]{0,6}(?P<value>-?\d[\d,]*(?:\.\d+)?)\s*(?P<unit>pA|nA|µA|μA|uA)(?![A-Za-z])']
+    unit_aliases:
+      uA: [µA, μA]
+  specimen_tilt:
+    role: condition
+    target: conditions
+    unit: deg
+    data_type: number
+    patterns: ['(?:試料傾斜角|傾斜角|[Tt][Ii][Ll][Tt])[^\d\n]{0,6}(?P<value>-?\d[\d,]*(?:\.\d+)?)\s*(?P<unit>deg|°|度)(?![A-Za-z])']
+    unit_aliases:
+      deg: [°, 度]

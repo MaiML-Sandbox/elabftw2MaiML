@@ -115,3 +115,39 @@ def test_without_field_mapping_option_behaves_as_before(tmp_path, monkeypatch, c
     assert output_path.exists()
     out = capsys.readouterr().out
     assert "対応表" not in out
+
+
+_FIELD_MAPPING_YAML_V2 = """
+version: 2
+semantic_types:
+  resolution:
+    role: condition
+    target: conditions
+    context: experiment
+    data_type: number
+    fields: [Resolution]
+"""
+
+
+def test_field_mapping_option_accepts_version2_yaml(tmp_path, monkeypatch, capsys):
+    """version: 2 (Semantic Mapping) のYAMLでも、version 1と同様にCLIが動作する。"""
+    fake_experiment, raw_experiment_json, raw_items_json_by_id = FIXTURES["fixture_a"]()
+    fixture_client = make_client(ElabftwClient, fake_experiment, raw_experiment_json, raw_items_json_by_id)
+    monkeypatch.setattr(cli_module, "ElabftwClient", lambda **kwargs: fixture_client)
+
+    mapping_path = tmp_path / "mapping_v2.yaml"
+    mapping_path.write_text(_FIELD_MAPPING_YAML_V2, encoding="utf-8")
+    output_path = tmp_path / "out.maiml"
+    monkeypatch.setattr(sys, "argv", [
+        "elabftw_to_maiml.py",
+        "--experiment-id", str(fake_experiment.id),
+        "--host", "https://elab.example.org/api/v2",
+        "--api-key", "dummy-key",
+        "--output", str(output_path),
+        "--field-mapping", str(mapping_path),
+    ])
+
+    assert cli_module.main() == 0
+    assert output_path.read_bytes().startswith(b"<?xml")
+    out = capsys.readouterr().out
+    assert "resolution" in out and "反映" in out

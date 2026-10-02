@@ -69,7 +69,8 @@ def main() -> int:
     parser.add_argument("--field-mapping", default=None, metavar="PATH",
                          help="[Phase 5-2/5-3・任意] 実際のCustom Field名をsemantic_type/role/"
                               "unit/context/targetに対応付けるYAML設定ファイルのパス "
-                              "(elabftw2maiml/interpretation/field_mappings/sem_tem_example.yaml が"
+                              "(elabftw2maiml/interpretation/field_mappings/sem_tem_example.yaml (version 1) /"
+                              "sem_tem_v2.yaml (version 2: 自由記述の抽出パターンもYAMLで定義) が"
                               "書式の例)。指定すると、実験のExtra Fieldsと自由記述 (実験本文・Step本文)"
                               "を突き合わせ、食い違いが無い値だけを自動反映してMaiMLを生成する。"
                               "食い違いがある値・役割 (role) や反映先 (target) が確定しない値は"
@@ -132,23 +133,25 @@ def main() -> int:
 
     if args.field_mapping:
         from elabftw2maiml.interpretation import (
-            FieldMapping,
+            load_mapping_file,
             build_structured_candidates,
             find_missing_required_fields,
             InterpretationPipeline,
             apply_interpretation_report,
             format_interpretation_report,
-            SemTemTextRuleInterpreter,
         )
 
-        field_mapping = FieldMapping.from_yaml_file(args.field_mapping)
+        # version: 1 -> FieldMapping + SemTemTextRuleInterpreter (従来通り)
+        # version: 2 -> SemanticMapping (Custom Field/自由記述が同じ定義を共有)
+        loaded_mapping = load_mapping_file(args.field_mapping)
+        field_mapping = loaded_mapping.field_mapping
         raw_fields = client.fetch_raw_custom_fields(args.experiment_id)
         structured_candidates, unmapped_fields = build_structured_candidates(
             raw_fields, field_mapping, source="custom_field")
         missing_required_fields = find_missing_required_fields(raw_fields, field_mapping)
 
         pipeline = InterpretationPipeline(
-            extra_text_interpreters=[SemTemTextRuleInterpreter()],
+            extra_text_interpreters=loaded_mapping.text_interpreters,
             confidence_threshold=args.confidence_threshold,
         )
         report = pipeline.interpret_experiment(exp_data, structured_candidates=structured_candidates)

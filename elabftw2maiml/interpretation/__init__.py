@@ -35,6 +35,14 @@ from .field_mapping import (
     find_missing_required_fields,
 )
 from .profiles import SemTemTextRuleInterpreter, SEM_TEM_PHASE1_SEMANTIC_TYPES
+from .semantic_mapping import (
+    SemanticRule,
+    SemanticMapping,
+    SemanticMappingError,
+    LoadedMapping,
+    load_mapping_file,
+)
+from .configured_text import ConfiguredTextRuleInterpreter
 from .apply import apply_interpretation_report
 from .normalize import NormalizedValue, parse_numeric_with_unit, canonical_unit
 
@@ -69,6 +77,12 @@ __all__ = [
     "find_missing_required_fields",
     "SemTemTextRuleInterpreter",
     "SEM_TEM_PHASE1_SEMANTIC_TYPES",
+    "SemanticRule",
+    "SemanticMapping",
+    "SemanticMappingError",
+    "LoadedMapping",
+    "load_mapping_file",
+    "ConfiguredTextRuleInterpreter",
     "apply_interpretation_report",
     "NormalizedValue",
     "parse_numeric_with_unit",

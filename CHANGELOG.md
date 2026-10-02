@@ -4,6 +4,26 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Semantic Mapping (対応表 version 2)** (`elabftw2MaiML_semantic_mapping_externalization_design.md`)。
+  `semantic_type` を軸に、Custom Field名 (`fields`)・自由記述の抽出正規表現
+  (`patterns`)・`role`/`target`/`unit` を1か所で定義できるようにした。
+  - `interpretation/semantic_mapping.py` (`SemanticRule`/`SemanticMapping`/
+    `load_mapping_file`)。読み込み時に正規表現のコンパイル、named group
+    (`value` 必須/`unit` 任意)、role/target/data_typeの許可値、Custom Field名の
+    重複を検証する (`SemanticMappingError`)。
+  - `interpretation/configured_text.py` (`ConfiguredTextRuleInterpreter`)。
+    patternsから抽出し、`SemanticRule` の `role`/`target` を付与する。
+  - `ExtractedValue` に任意の `role`/`target` を追加し、
+    `candidate_from_extracted_value()` が `InterpretationCandidate` へ引き継ぐ。
+    これにより、自由記述由来の候補も `--confidence-threshold 0.95` で
+    自動反映できる。
+  - 同梱の `field_mappings/sem_tem_v2.yaml` (SEM/TEM 8種の抽出パターンをPythonから
+    YAMLへ移行。`SemTemTextRuleInterpreter` と出力が一致することをテストで確認)。
+  - `--field-mapping` は `version` で読み分ける。`version: 1` のYAMLと
+    `SemTemTextRuleInterpreter` は従来通り動作する (後方互換)。
+
 ### Breaking
 
 - データモデル対称化改修 (`elabftw2MaiML_model_refactoring_plan.md`)。

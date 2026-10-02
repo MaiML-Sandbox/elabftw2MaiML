@@ -94,7 +94,13 @@ elabftw2maiml/
     field_mapping.py        RawField/FieldRule/FieldMapping (Phase5-2: eLabFTWのCustom Field名を
                           role/semantic_type/unit/context/targetに対応付ける設定可能な対応表。
                           対応表自体はYAML/dictとして外部化されており、コードには固定しない)
+    semantic_mapping.py     SemanticRule/SemanticMapping/load_mapping_file (version 2 対応表:
+                          semantic_typeを中心に fields/patterns/role/target/unit を1か所で定義。
+                          読み込み時に正規表現・role・target等を検証する)
+    configured_text.py      ConfiguredTextRuleInterpreter (version 2 のpatternsから自由記述を抽出し、
+                          SemanticRuleのrole/targetを付与する設定駆動のInterpreter)
     field_mappings/
+      sem_tem_v2.yaml       SEM/TEM対応表 (version 2。自由記述の抽出パターンもYAMLで定義)
       sem_tem_example.yaml  SEM/TEM観察の汎用的な対応表の例 (SEM_TEM_field_mapping_example.md
                           10節のMVPフィールド一覧に対応。装置メーカーや特定研究室に依存しない
                           一般例であり、実運用ではフィールド名・単位を必ず調整すること)
@@ -255,6 +261,55 @@ ExperimentDataへの反映段階でも維持しています)。
 対応表の`unit`と実際の入力形式を揃えるか、値の前処理を別途検討してください
 (development planのPhase 5-4「実データによる検証」で確認する想定の項目です)。
 
+### 対応表 version 2 (Semantic Mapping): 自由記述も対応表で定義する
+
+`--field-mapping` のYAMLは `version` で読み分けられます (省略時は 1)。
+
+- `version: 1` (従来): Custom Field名 → semantic_type/role/target の対応のみ。
+  自由記述の抽出はPython固定の `SemTemTextRuleInterpreter` が行い、抽出値には
+  `role`/`target` が付かないため、`--confidence-threshold` を下げても自動反映
+  されません。
+- `version: 2` (Semantic Mapping): `semantic_type` を軸に、Custom Field名
+  (`fields`)・自由記述の抽出正規表現 (`patterns`)・`role`/`target`/`unit` を
+  1つの定義にまとめます。Custom Field経由でも自由記述経由でも、同じ
+  semantic_typeに到達すれば同じ `role`/`target` で ExperimentData へ反映されます。
+  Pythonコードを変更せず、分野ごとの抽出ルールを追加できます。
+
+```yaml
+version: 2
+semantic_types:
+  accelerating_voltage:
+    role: condition
+    target: conditions
+    unit: kV
+    data_type: number
+    fields: [加速電圧, Acceleration Voltage, HV]   # Custom Field名 / alias
+    unit_aliases: {kV: [KV, kv]}                   # 生の表記 -> 正規化後の単位
+    patterns:                                      # 自由記述から抽出する正規表現
+      - '(?:加速電圧|HV)[^\d\n]{0,6}(?P<value>-?\d[\d,]*(?:\.\d+)?)\s*(?P<unit>kV|KV|kv|V)(?![A-Za-z])'
+```
+
+`patterns` のルール (読み込み時に検証され、違反は `SemanticMappingError`):
+`(?P<value>...)` が必須、`(?P<unit>...)` は任意 (無い場合は定義の `unit` を
+固定単位として使う。例: 倍率の `x`)。`role` は
+material/condition/result/instrument/creator/vendor、`target` は
+materials/conditions/results/instrument のみ。同じ Custom Field名を複数の
+semantic_typeに定義することはできません。単位だけの表現 ("5 kV") を拾う
+パターンは誤検出の原因になるため、「意味キーワード + 数値 + 単位」で書いてください。
+
+自由記述由来の候補のconfidenceは従来通り0.95なので、
+`--confidence-threshold 0.95` を指定すると、他の自動反映条件
+(競合なし・role/target/context確定) を満たす自由記述候補が反映されます
+(contextは `step:<id>` / `experiment`)。同梱の `sem_tem_v2.yaml` は
+`sem_tem_example.yaml` と同じCustom Field対応に、従来Pythonに固定されていた
+SEM/TEMの8種の抽出パターンを加えたものです (出力は
+`SemTemTextRuleInterpreter` と一致することをテストで確認しています)。
+
+注意: Custom Fieldの候補のcontextは対応表の `context` (未指定ならNone)、
+自由記述の候補のcontextは原文の位置 (`experiment`/`step:<id>`) です。競合判定は
+`(semantic_type, context, role, target)` 単位なので、両者を突き合わせたい場合は
+Custom Field側の `context` を `experiment` などに合わせてください。
+
 ## テスト
 
 実際のeLabFTWサーバーに接続せず、合成 (synthetic) フィクスチャに対して
@@ -360,6 +415,10 @@ python -m pytest tests/
   `apply_interpretation_report()` -> `MaimlBuilder.to_bytes()` という実際の
   呼び出し順序で通して確認する。生成XMLの整形式性と、`schemas/maiml.xsd`が
   存在する場合はそれに対する妥当性も検証する (無い環境ではスキップ)。
+- `tests/test_semantic_mapping.py`: version 2対応表 (`semantic_mapping.py`/
+  `configured_text.py`) のYAML検証・Custom Field/自由記述の双方からのrole/target付与・
+  `--confidence-threshold`による反映・競合検出・`SemTemTextRuleInterpreter`との出力等価性・
+  version 1 YAMLの後方互換。
 - `tests/test_cli_field_mapping.py`: `elabftw_to_maiml.py`の`--field-mapping`
   オプション (Phase5-3のCLI統合) のテスト。ネットワークに接続せず
   `tests.fixtures`の合成データで`ElabftwClient`を差し替え、CLI全体が

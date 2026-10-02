@@ -42,6 +42,10 @@ class ExtractedValue:
         "llm" 等になる想定)。
     confidence:
         抽出の確信度。正規表現による明確な一致では 1.0 とする。
+    role / target:
+        Semantic Mapping (`semantic_mapping.SemanticRule`) から補完された
+        MaiML上の役割・反映先 (外部化設計 3節・14節)。汎用の `TextRuleInterpreter`
+        や `SemTemTextRuleInterpreter` は設定しない (None のまま)。
     """
 
     semantic_type: str
@@ -50,6 +54,8 @@ class ExtractedValue:
     source_text: str
     method: str = "regex"
     confidence: float = 1.0
+    role: Optional[str] = None
+    target: Optional[str] = None
 
 
 # 単位表記の正規化テーブル (原文中の生の単位表記 -> 正規化後の単位)。
