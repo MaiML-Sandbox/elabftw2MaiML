@@ -14,6 +14,10 @@
 # 実運用ではeLabFTW上の実際のCustom Field名・記録ルールに合わせて調整すること。
 
 version: 2
+
+# duration/temperature等、SEM/TEM以外でも使う共通の定義 (common_semantics.yaml) を取り込む。
+# 同名のsemantic_typeをこのファイルで定義すると、取り込んだ定義を上書きする。
+include: [common_semantics.yaml]
 semantic_types:
   sample_id:
     role: material
@@ -32,6 +36,7 @@ semantic_types:
     role: condition
     target: conditions
     unit: kV
+    dimension: voltage
     data_type: number
     required: true
     fields: [加速電圧, Acceleration Voltage, Accelerating Voltage, HV]
@@ -56,6 +61,7 @@ semantic_types:
     role: condition
     target: conditions
     unit: mm
+    dimension: length
     data_type: number
     context: sem_acquisition
     fields: [ワーキングディスタンス, Working Distance, WD]
@@ -78,6 +84,7 @@ semantic_types:
     role: result
     target: results
     unit: nm
+    dimension: length
     data_type: number
     fields: [粒径, Particle Size, Diameter]
     patterns: ['(?:粒径|[Pp]article\s*[Ss]ize)[^\d\n]{0,6}(?P<value>-?\d[\d,]*(?:\.\d+)?)\s*(?P<unit>nm|µm|μm|um|mm)(?![A-Za-z])']
@@ -100,6 +107,7 @@ semantic_types:
     role: condition
     target: conditions
     unit: mm
+    dimension: length
     data_type: number
     context: tem_diffraction
     fields: [カメラ長, Camera Length]
@@ -121,6 +129,7 @@ semantic_types:
     role: result
     target: results
     unit: nm
+    dimension: length
     data_type: number
     context: tem_analysis
     fields: [格子縞間隔, Lattice Spacing, d-spacing]
@@ -138,6 +147,7 @@ semantic_types:
     role: condition
     target: conditions
     unit: pA
+    dimension: current
     data_type: number
     patterns: ['(?:プローブ電流|ビーム電流|照射電流)[^\d\n]{0,6}(?P<value>-?\d[\d,]*(?:\.\d+)?)\s*(?P<unit>pA|nA|µA|μA|uA)(?![A-Za-z])']
     unit_aliases:

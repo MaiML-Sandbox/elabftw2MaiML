@@ -55,6 +55,9 @@ class TextSection:
     section_type: 分類後の標準カテゴリ (未分類は None、辞書に無ければ "unknown")
     context:   分類後に決まる context 文字列 (階層pathを含む表示・候補用)
     type_index: 同じ section_type の中での通し番号 (washing:1, washing:2, ...)
+    operation / operation_object:
+               見出しから読み取った操作と対象 (`operations.OperationInterpreter` を
+               `SectionClassifier` に渡した場合のみ。例: "sem_measurement" / "iron")
     """
 
     key: str
@@ -66,6 +69,8 @@ class TextSection:
     section_type: Optional[str] = None
     context: Optional[str] = None
     type_index: int = 0
+    operation: Optional[str] = None          # 見出しから読み取った操作 (Operation Interpreter)
+    operation_object: Optional[str] = None   # その対象
 
     @property
     def is_preamble(self) -> bool:
@@ -414,18 +419,37 @@ class SectionDetector:
 
 class SectionClassifier:
     """見出しを標準の `section_type` へ分類し、`context` を付ける。
-    辞書に無い見出しは `unknown` として保持する (設計 「ユーザー固有見出しへの対応」)。"""
+    辞書に無い見出しは `unknown` として保持する (設計 「ユーザー固有見出しへの対応」)。
 
-    def __init__(self, mapping: SectionMapping):
+    operation_interpreter:
+        指定すると、見出しから操作 (operation/object) も読み取って
+        `TextSection.operation` / `operation_object` に残す。見出しが `SectionMapping`
+        の辞書に無い場合に限り、操作に結び付いた `section_type` を分類のヒントとして
+        使う (例: 「鉄をSEM計測する」-> observation)。辞書で分類できた場合は
+        辞書を優先する。"""
+
+    def __init__(self, mapping: SectionMapping, operation_interpreter=None):
         self._mapping = mapping
+        self._operation_interpreter = operation_interpreter
 
     def classify(self, section: TextSection) -> TextSection:
-        """1つのセクションに `section_type` だけを付けて返す (context・連番は
+        """1つのセクションに `section_type` (と操作) だけを付けて返す (context・連番は
         セクション間の関係が要るため `classify_all()` で付ける)。"""
         if section.is_preamble:
             return replace(section, section_type=UNKNOWN_SECTION_TYPE)
         matched = self._mapping.match_heading(section.title)
-        return replace(section, section_type=matched[0] if matched else UNKNOWN_SECTION_TYPE)
+        section_type = matched[0] if matched else UNKNOWN_SECTION_TYPE
+        operation = operation_object = None
+        if self._operation_interpreter is not None:
+            op = self._operation_interpreter.interpret(section.title)
+            if op is not None:
+                operation, operation_object = op.operation, op.object
+                if matched is None:
+                    hint = self._operation_interpreter.section_type_for(op.operation)
+                    if hint:
+                        section_type = hint
+        return replace(section, section_type=section_type,
+                       operation=operation, operation_object=operation_object)
 
     def classify_all(self, sections: Sequence[TextSection]) -> List[TextSection]:
         """全セクションを分類し、同じ section_type の通し番号
@@ -453,3 +477,49 @@ class SectionClassifier:
             by_key[classified.key] = classified
             out.append(classified)
         return out
+
+
+# ---------------------------------------------------------------------------
+# Statement (セクション内の1文・1操作)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class Statement:
+    """セクション本文を分けた1つの文 (設計 「Section と Statement の階層」)。
+
+    key:     "section:3/statement:2"
+    context: セクションの context + "/statement:<n>"
+             (例: "section:dehydration:1/statement:2")
+    """
+
+    key: str
+    text: str
+    index: int
+    section_key: str
+    context: str
+
+
+class StatementSplitter:
+    """セクション本文を、1つの処理ごとの `Statement` に分ける。
+
+    初期実装は改行単位 (空行は除く)。1つの処理が複数行にまたがる場合は
+    行ごとに別のStatementになる (将来、規則やLLMによる結合を追加する)。
+    見出しの前の前置セクション (context="experiment") は分割しない。
+
+    セクション内に値の異なる複数の処理がある本文 (例: 脱水の 5/10/10/10 min) でも、
+    Statementごとに context が分かれるため、不要な競合にならない。
+    """
+
+    def split(self, section: TextSection) -> List[Statement]:
+        if section.is_preamble or not section.context:
+            return []
+        statements: List[Statement] = []
+        for line in section.body.splitlines():
+            text = line.strip()
+            if not text:
+                continue
+            n = len(statements) + 1
+            statements.append(Statement(
+                key=f"{section.key}/statement:{n}", text=text, index=n,
+                section_key=section.key, context=f"{section.context}/statement:{n}"))
+        return statements

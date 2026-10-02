@@ -1,0 +1,40 @@
+# 見出しの操作意味 (operation / object) の既定辞書
+# (elabftw2MaiML_section_semantic_review_fixes.md 2節)。
+#
+# 「鉄をSEM計測する」-> operation=sem_measurement, object=iron のように、自然文の見出しから
+# 操作と対象を取り出す。見出しは正規化 (全角/半角・大文字小文字) して比較し、英数字だけの語は
+# 前後が英数字でない場合のみ一致とみなす。最も長いキーワードが優先される。
+#
+# section_type は任意で、見出しが section_mappings の辞書に無いときだけ、分類のヒントとして使う
+# (section_type と operation は別概念: 前者は文書構造、後者は実験操作の意味)。
+# 対象語 (objects) は例。実際に扱う試料・試薬に合わせて追加すること。
+
+version: 1
+
+operations:
+  sem_measurement:
+    keywords: [SEM計測, SEM観察, SEM撮影, SEM測定, 走査電子顕微鏡, SEM]
+    section_type: observation
+  tem_measurement:
+    keywords: [TEM計測, TEM観察, TEM撮影, TEM測定, 透過電子顕微鏡, TEM]
+    section_type: observation
+  fixation:
+    keywords: [固定]
+    section_type: fixation
+  washing:
+    keywords: [洗浄, 洗う]
+    section_type: washing
+  drying:
+    keywords: [乾燥]
+    section_type: drying
+  dehydration:
+    keywords: [脱水]
+    section_type: dehydration
+
+objects:
+  iron: [鉄, Fe, iron]
+  gold: [金, Au, gold]
+  silver: [銀, Ag, silver]
+  copper: [銅, Cu, copper]
+  carbon: [炭素, carbon]
+  cell: [細胞, cell, cells]

@@ -89,12 +89,25 @@ def main() -> int:
                               "異なる工程の同種の値 (例: 20分と30分) が不要な競合になるのを避けられる。"
                               "辞書に無い見出しは未知のセクションとして本文ごと保持され、"
                               "レポートに表示される。省略時は従来通り実験本文全体を1つとして扱う")
+    parser.add_argument("--operation-mapping", default=None, metavar="PATH",
+                         help="[任意・--section-mapping指定時のみ有効] 見出しの操作意味 (operation/object) の"
+                              "辞書YAML (elabftw2maiml/interpretation/operation_mappings/default_operations.yaml"
+                              "が書式の例)。「鉄をSEM計測する」のような自然文の見出しから"
+                              "operation=sem_measurement, object=iron を読み取ってレポートに表示し、"
+                              "見出しがsection辞書に無い場合の分類ヒントにも使う")
+    parser.add_argument("--split-statements", action="store_true",
+                         help="[--section-mapping指定時のみ有効] 各セクションの本文を1行ずつの文に分け、"
+                              "contextを section:<種別>:<n>/statement:<m> にする。同じセクション内に"
+                              "値の異なる複数の処理 (例: 脱水の5分/10分) がある場合の不要な競合を避けられる。"
+                              "反映先のオブジェクトは文ごとに分かれる")
     args = parser.parse_args()
 
     if not args.host or not args.api_key:
         parser.error("--host/--api-key (または環境変数 ELABFTW_HOST/ELABFTW_API_KEY) が必要です")
     if args.section_mapping and not args.field_mapping:
         parser.error("--section-mapping は --field-mapping と一緒に指定してください")
+    if (args.operation_mapping or args.split_statements) and not args.section_mapping:
+        parser.error("--operation-mapping/--split-statements は --section-mapping と一緒に指定してください")
 
     def _parse_role_candidates(items, legacy_instrument_items):
         """'ROLE=VALUE' 形式の引数リストを {role: [value, ...]} にまとめる。
@@ -164,13 +177,21 @@ def main() -> int:
         structured_body = None
         if args.section_mapping:
             from elabftw2maiml.interpretation import (
-                SectionMapping, SectionDetector, SectionClassifier,
+                SectionMapping, SectionDetector, SectionClassifier, StatementSplitter,
+                OperationMapping, OperationInterpreter,
             )
             section_mapping = SectionMapping.from_yaml_file(args.section_mapping)
+            operation_interpreter = None
+            if args.operation_mapping:
+                operation_interpreter = OperationInterpreter(
+                    OperationMapping.from_yaml_file(args.operation_mapping))
             section_kwargs = dict(
                 section_detector=SectionDetector(section_mapping),
-                section_classifier=SectionClassifier(section_mapping),
+                section_classifier=SectionClassifier(
+                    section_mapping, operation_interpreter=operation_interpreter),
             )
+            if args.split_statements:
+                section_kwargs["statement_splitter"] = StatementSplitter()
             # exp_data.body_text はHTML除去で改行が失われているため、構造付きの本文を取得する
             structured_body = client.fetch_body_structured(args.experiment_id)
 

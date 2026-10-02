@@ -6,6 +6,21 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- **Section/Semantic Interpretation レビュー対応** (`elabftw2MaiML_section_semantic_review_fixes.md`)。
+  - 共通 semantics (`field_mappings/common_semantics.yaml`: duration/temperature/repeat_count/
+    rotation_speed/ph) と、対応表の `include:`。`sem_tem_v2.yaml` から取り込み、実YAMLでも
+    時間・温度の `role`/`target` が補完されるようにした。
+  - 単位の標準化 (`interpretation/units.py`, `SemanticRule.dimension`/`canonical_unit`)。
+    `11 h` -> `660 min` のように `semantic_type` を保ったまま換算する。v2 の `patterns` 由来の値
+    (加速電圧 `5000 V` -> `5 kV` 等) も換算する。
+  - `StatementSplitter` / `--split-statements`: 同一セクション内の複数操作を
+    `section:<type>:<n>/statement:<m>` に分け、競合を避ける。
+  - `OperationInterpreter` / `--operation-mapping`: 辞書に無い自然文の見出しから
+    operation/object を推定 (`operation_mappings/default_operations.yaml`)。
+  - `5 minx2` を `duration` + `repeat_count` に分解。見出し中の値は意味キーワード付き
+    patterns のみ適用。
+  - README に階層対応範囲 (Markdown/HTML 見出しのみ) を明記。
+  - 未実装: 濃度 (試薬の修飾子モデル)、statement_type、質量・体積の共通定義。
 - **実験本文のセクション分割・分類** (`elabftw2MaiML_section_detection_classification_design.md`
   Phase A〜D)。`--section-mapping` (`--field-mapping` 指定時のみ) で、実験本文を見出しごとに
   分割・分類し、候補の context を `section:<section_type>:<連番>` にする。

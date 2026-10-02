@@ -374,9 +374,52 @@ STEP や MaiML の transition は生成しません。STEP本文は従来通り 
 - **考察・メモの除外**: `note` 型のセクション (考察・メモ・コメント) の値は、抽出はしますが
   `role`/`target` を外して `unclassified` に残します (「0.05%や0.01%」のような条件ではない
   数値を誤反映しないため)。`InterpretationPipeline(excluded_section_types=...)` で変更できます。
-- **未対応 (今後)**: 1つのセクション内に値の異なる複数の処理がある場合 (例: 脱水の
-  5/10 min) は、依然として競合になります (Statement分割は未実装)。濃度・細胞濃度・
-  `minx2` 等の抽出ルール、`Operation Interpreter` も未実装です。
+- **階層の対応範囲**: 階層 (親子セクション) として扱うのは **Markdown 見出し (`#`/`##`) と
+  HTML 見出し (`<h1>`〜`<h6>`)** だけです。インデントや番号 (`1.` `1.1`) による階層、
+  「■」「【】」等の記号だけの見出しの階層推定は**未対応**で、フラットな見出しとして扱います。
+  階層が欲しい場合は eLabFTW の見出し機能 (Markdown/HTML の見出し) で書いてください。
+- **見出しの値**: 見出し自体に値が書かれている場合 (`## 加速電圧 5 kV`) は、意味キーワードを
+  伴う v2 の `patterns` だけを見出しに適用します。「20 min」のように単位だけで判定する
+  汎用抽出器は見出しには適用しません (見出し「20 min」を時間条件にしないため)。
+
+#### 見出しの自然文からの操作推定 (`--operation-mapping`)
+
+辞書に無い見出し (「鉄をSEM計測する」) は通常 `unknown` ですが、`--operation-mapping`
+(`--section-mapping` が必要) を指定すると `OperationInterpreter` が見出し中のキーワードから
+操作 (`operation`) と対象 (`object`) を推定します
+(`operation_mappings/default_operations.yaml`)。
+
+```
+section:observation:1  title=鉄をSEM計測する  operation=sem_measurement  object=iron
+```
+
+- 辞書に載っている見出し (前固定 など) の `section_type` は変えません。辞書に無い見出しで
+  operation に `section_type` が定義されている場合だけ、ヒントとして使います
+  (複数ヒットしたときは長いキーワードを優先)。
+- `section_type` は文書構造、`operation`/`object` は操作の意味であり、`role` とは別です。
+
+#### 同一セクション内の複数操作 (`--split-statements`)
+
+`--section-mapping` を指定したうえで `--split-statements` を付けると、セクション本文を
+1行 = 1 statement に分け、context を `section:<type>:<n>/statement:<m>` にします。
+脱水の `5 min` / `10 min` / `10 min` のように、同じセクション内で値の異なる操作が並ぶ場合の
+競合を避けられます (見出し直後の前置き本文は分割しません)。
+
+#### 単位の標準化 (`dimension` / `canonical_unit`) と共通 semantics
+
+v2 対応表の `semantic_types` に `dimension` (time/voltage/length/volume/mass/current/
+temperature/rotation_speed) と `canonical_unit` (省略時は `unit`) を書くと、
+`11 h` は `semantic_type=duration` のまま `660 min` に換算して反映します
+(換算前の値と理由は候補に残ります。未知の単位は換算せず自動反映を見送ります)。
+対応表の `include: [common_semantics.yaml]` で、装置に依らない共通定義
+(`duration`/`temperature`/`repeat_count`/`rotation_speed`/`ph`) を取り込めます
+(自分の定義が優先、循環 include はエラー)。`5 minx2` は `duration=5 min` と
+`repeat_count=2` に分かれます。
+
+- **未対応 (今後)**: 濃度 (`30% EtOH` のような試薬に紐づく値。試薬を表す修飾子モデルが
+  必要)、細胞濃度、statement 単位の考察文判定 (`statement_type`)、質量・体積
+  (role が文脈依存のため共通定義には未収録) は未実装です。考察文は `note` セクション内のものだけ
+  自動反映から除外されます。
 - 研究室・ユーザー独自の見出しは、`default_sections.yaml` をコピーして `headings` を
   書き足してください (Pythonコードの変更は不要)。
 

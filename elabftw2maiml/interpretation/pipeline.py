@@ -28,11 +28,13 @@ from typing import Any, List, Optional, Sequence
 
 from .conflict import Conflict, InterpretationCandidate, detect_conflicts
 from .normalize import canonical_unit
+from .units import normalize_quantity
 from .policy import candidate_from_extracted_value
 from .sections import (
     UNKNOWN_SECTION_TYPE,
     SectionClassifier,
     SectionDetector,
+    StatementSplitter,
     TextSection,
 )
 from .text import TextRuleInterpreter
@@ -129,6 +131,7 @@ class InterpretationPipeline:
         section_detector: Optional[SectionDetector] = None,
         section_classifier: Optional[SectionClassifier] = None,
         excluded_section_types: Sequence[str] = ("note",),
+        statement_splitter: Optional[StatementSplitter] = None,
     ):
         """
         extra_text_interpreters:
@@ -161,10 +164,20 @@ class InterpretationPipeline:
             該当セクションの候補は抽出するが `role`/`target` を外し、
             `unclassified` に理由付きで残す (考察文中の「0.05%や0.01%」のような
             実験条件ではない数値を誤って反映しないため)。
+        statement_splitter:
+            指定すると、各セクションの本文を `StatementSplitter` で1文ずつに分け、
+            context を `section:<type>:<n>/statement:<m>` にする。同一セクション内に
+            値の異なる複数の処理がある場合 (脱水の 5/10 min など) の不要な競合を
+            避ける。セクション分割 (section_detector/section_classifier) が必要。
+            ただし反映先のオブジェクト (ConditionData等) はStatementごとに分かれる。
         """
         if (section_detector is None) != (section_classifier is None):
             raise ValueError(
                 "section_detector と section_classifier は両方を指定してください")
+        if statement_splitter is not None and section_detector is None:
+            raise ValueError("statement_splitter にはセクション分割 (section_detector/"
+                             "section_classifier) が必要です")
+        self._statement_splitter = statement_splitter
         self._section_detector = section_detector
         self._section_classifier = section_classifier
         self._excluded_section_types = frozenset(excluded_section_types)
@@ -174,20 +187,43 @@ class InterpretationPipeline:
         self.confidence_threshold = confidence_threshold
 
     def _complete_from_mapping(self, candidate: InterpretationCandidate) -> InterpretationCandidate:
-        """role/targetが未確定の自由記述候補を、semantic_typeをキーに対応表から補完する。"""
+        """role/targetが未確定の自由記述候補を、semantic_typeをキーに対応表から補完する。
+
+        対応表に `dimension` がある場合は、値を標準単位へ換算してから補完する
+        (`11 h` -> `660 min`。`units.normalize_quantity()`)。換算できない値
+        (未知の単位) は、semantic_type を保持したまま補完だけを行わない。"""
         if self._field_mapping is None:
-            return candidate
-        if candidate.role is not None and candidate.target is not None:
             return candidate
         rule = self._field_mapping.lookup_semantic_type(candidate.semantic_type)
         if rule is None:
             return candidate
-        if (
-            rule.unit is not None
+        # role/target が既に付いている候補 (v2 の patterns 由来) も、単位換算だけは行う
+        already_classified = candidate.role is not None and candidate.target is not None
+        if already_classified and getattr(rule, "dimension", None) is None:
+            return candidate
+
+        if getattr(rule, "dimension", None) is not None:
+            converted = normalize_quantity(
+                candidate.value, candidate.unit, rule.dimension, rule.unit)
+            if converted is None:
+                return candidate
+            value, unit = converted
+            if (value, unit) != (candidate.value, candidate.unit):
+                candidate = replace(
+                    candidate, value=value, unit=unit,
+                    raw_value=candidate.raw_value if candidate.raw_value is not None
+                    else candidate.value,
+                    reason=(f"{candidate.value} {candidate.unit} を標準単位 "
+                            f"{value} {unit} に換算しました"),
+                )
+        elif (
+            not already_classified
+            and rule.unit is not None
             and candidate.unit is not None
             and canonical_unit(rule.unit) != canonical_unit(candidate.unit)
         ):
             return candidate
+
         return replace(
             candidate,
             role=candidate.role if candidate.role is not None else rule.role,
@@ -236,8 +272,22 @@ class InterpretationPipeline:
                 sections = self._section_classifier.classify_all(
                     self._section_detector.split(text))
                 for section in sections:
-                    found = self._extract_from(section.body, section.context, interpreters)
-                    if section.section_type in self._excluded_section_types:
+                    excluded = section.section_type in self._excluded_section_types
+                    found: List[InterpretationCandidate] = []
+                    # 見出し自体に「加速電圧 5 kV」のように値が書かれている場合は、
+                    # 意味キーワードを伴う抽出器 (extra_text_interpreters) だけで拾う。
+                    # 単位だけで判定する汎用抽出器 (温度・時間など) は見出しには使わない。
+                    if section.title:
+                        found.extend(self._extract_from(
+                            section.title, section.context, self._extra_text_interpreters))
+                    statements = (self._statement_splitter.split(section)
+                                  if self._statement_splitter is not None else [])
+                    if statements:
+                        for st in statements:
+                            found.extend(self._extract_from(st.text, st.context, interpreters))
+                    else:
+                        found.extend(self._extract_from(section.body, section.context, interpreters))
+                    if excluded:
                         found = [
                             replace(
                                 c, role=None, target=None,
@@ -342,7 +392,11 @@ def format_interpretation_report(report: InterpretationReport) -> str:
         for s in report.sections:
             if s.is_preamble:
                 continue
-            lines.append(f"  - {s.title!r} -> {s.section_type} (context={s.context})")
+            op = ""
+            if s.operation:
+                op = f", operation={s.operation}" + (
+                    f", object={s.operation_object}" if s.operation_object else "")
+            lines.append(f"  - {s.title!r} -> {s.section_type} (context={s.context}{op})")
         unknown = [s for s in report.sections
                    if not s.is_preamble and s.section_type == UNKNOWN_SECTION_TYPE]
         if unknown:

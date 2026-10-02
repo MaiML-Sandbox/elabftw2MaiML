@@ -28,7 +28,7 @@ class ExtractedValue:
 
     semantic_type:
         抽出した値の意味種別。"temperature" / "duration" / "mass" / "volume" /
-        "rotation_speed" / "ph" のいずれか。
+        "rotation_speed" / "ph" / "repeat_count" のいずれか。
     value:
         抽出した数値 (小数点を含まない表記はint、含む表記はfloatとして保持する)。
     unit:
@@ -113,8 +113,13 @@ _PATTERNS = [
     ("temperature", re.compile(_NUM + r"\s*(℃|°C|°c)")),
     ("temperature", re.compile(r"(?<![A-Za-z0-9])" + _NUM + r"\s*(K)(?![A-Za-z])")),
     # -- 時間 (s, sec, min, h および 分/秒/時間/時) -----------------------------
+    # 単位の直後に繰り返し回数 ("5 minx2" / "5 min×2") が続く表記も許容する
     ("duration", re.compile(
-        _NUM + r"\s*(secs|mins|hrs|sec|min|hr|時間|分|秒|時|s|h)(?![A-Za-z])")),
+        _NUM + r"\s*(secs|mins|hrs|sec|min|hr|時間|分|秒|時|s|h)"
+        r"(?:(?![A-Za-z])|(?=[xX×]\s*\d))")),
+    # -- 繰り返し回数 ("5 minx2" の x2)。直前の時間とセット。値=回数、単位なし ----------
+    ("repeat_count", re.compile(
+        _NUM + r"\s*(?:secs|mins|hrs|sec|min|hr|時間|分|秒|時|s|h)\s*[xX×]\s*(\d+)(?!\d)")),
     # -- 質量 (mg, g, kg) ------------------------------------------------------
     ("mass", re.compile(_NUM + r"\s*(mg|kg|g)(?![A-Za-z])")),
     # -- 体積 (µL, μL, mL, L) ---------------------------------------------------
@@ -145,6 +150,9 @@ class TextRuleInterpreter:
             for m in pattern.finditer(text):
                 if semantic_type == "ph":
                     value_str = m.group(1)
+                    canonical_unit = None
+                elif semantic_type == "repeat_count":
+                    value_str = m.group(2)
                     canonical_unit = None
                 else:
                     value_str, raw_unit = m.group(1), m.group(2)

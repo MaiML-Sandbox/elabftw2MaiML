@@ -63,6 +63,7 @@ class FieldRule:
     data_type: Optional[str] = None
     required: bool = False
     aliases: Tuple[str, ...] = ()
+    dimension: Optional[str] = None
 
 
 class FieldMapping:

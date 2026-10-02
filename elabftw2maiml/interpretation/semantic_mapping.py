@@ -41,6 +41,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Mapping, Optional, Tuple
 
 from .field_mapping import FieldMapping, FieldRule
+from .units import DIMENSIONS, units_of
 
 # 設計 5節: role / target の許可値。
 ALLOWED_ROLES = (
@@ -72,6 +73,14 @@ class SemanticRule:
         表に無い表記は、大文字小文字を無視した照合を試み、それでも無ければ
         そのまま返す (未知の単位を黙って捨てない。従来の
         `normalize_sem_tem_unit()` と同じ方針)。
+    dimension / canonical_unit:
+        値の次元 (time/voltage/length/volume/mass/current/temperature/rotation_speed)
+        と、保存する標準単位 (例: dimension=time, canonical_unit=min)。指定すると、
+        自由記述で `11 h` と書かれた値を `660 min` に換算して反映できる
+        (`units.normalize_quantity()`)。「これは duration である」という意味判定
+        (semantic_type) と単位の統一を分けて扱う。`canonical_unit` を省略した場合は
+        `unit` を標準単位とみなす。換算できない値 (未知の単位) も semantic_type は
+        保持され、自動反映だけが見送られる。
     context:
         Custom Field 経由の候補に付ける既定 context (v1 の `FieldRule.context`
         相当)。自由記述経由の候補の context は常に原文の位置
@@ -88,6 +97,13 @@ class SemanticRule:
     fields: Tuple[str, ...] = ()
     patterns: Tuple[str, ...] = ()
     unit_aliases: Tuple[Tuple[str, str], ...] = ()
+    dimension: Optional[str] = None
+    canonical_unit: Optional[str] = None
+
+    @property
+    def standard_unit(self) -> Optional[str]:
+        """換算先の標準単位 (`canonical_unit`、無ければ `unit`)。"""
+        return self.canonical_unit if self.canonical_unit is not None else self.unit
 
     def compiled_patterns(self) -> List["re.Pattern[str]"]:
         return [re.compile(p) for p in self.patterns]
@@ -167,13 +183,14 @@ class SemanticMapping:
                 fields=_as_str_tuple(name, "fields", spec.get("fields")),
                 patterns=_as_str_tuple(name, "patterns", spec.get("patterns")),
                 unit_aliases=_flatten_unit_aliases(name, spec.get("unit_aliases")),
+                dimension=spec.get("dimension"),
+                canonical_unit=spec.get("canonical_unit"),
             )
         return cls(rules)
 
     @classmethod
     def from_yaml_file(cls, path: str) -> "SemanticMapping":
-        data = _load_yaml(path)
-        return cls.from_dict(data)
+        return cls.from_dict(_load_v2_data(path))
 
     # -- 検証 (設計 12節) -----------------------------------------------------
 
@@ -190,6 +207,28 @@ class SemanticMapping:
                 f"(apply_interpretation_report() が反映できるのは "
                 f"{list(ALLOWED_TARGETS)} のみ)"
             )
+        if rule.dimension is not None:
+            if rule.dimension not in DIMENSIONS:
+                raise SemanticMappingError(
+                    f"{name}: dimension={rule.dimension!r} は不正です (許可: {list(DIMENSIONS)})"
+                )
+            if rule.standard_unit is None:
+                raise SemanticMappingError(
+                    f"{name}: dimension を指定する場合は canonical_unit (または unit) が必要です"
+                )
+            if rule.unit is not None and rule.canonical_unit is not None \
+                    and rule.unit != rule.canonical_unit:
+                raise SemanticMappingError(
+                    f"{name}: unit={rule.unit!r} と canonical_unit={rule.canonical_unit!r} が"
+                    f"食い違っています (どちらか一方だけ指定してください)"
+                )
+            if rule.standard_unit not in units_of(rule.dimension):
+                raise SemanticMappingError(
+                    f"{name}: {rule.standard_unit!r} は dimension={rule.dimension!r} の単位では"
+                    f"ありません (許可: {list(units_of(rule.dimension))})"
+                )
+        elif rule.canonical_unit is not None:
+            raise SemanticMappingError(f"{name}: canonical_unit には dimension の指定が必要です")
         if rule.data_type is not None and rule.data_type not in ALLOWED_DATA_TYPES:
             raise SemanticMappingError(
                 f"{name}: data_type={rule.data_type!r} は不正です "
@@ -266,7 +305,8 @@ class SemanticMapping:
                 semantic_type=rule.semantic_type,
                 role=rule.role,
                 target=rule.target,
-                unit=rule.unit,
+                unit=rule.standard_unit,
+                dimension=rule.dimension,
                 context=rule.context,
                 data_type=rule.data_type,
                 required=rule.required,
@@ -281,7 +321,7 @@ class SemanticMapping:
 
 _ALLOWED_KEYS = {
     "role", "target", "unit", "data_type", "context", "required",
-    "fields", "patterns", "unit_aliases",
+    "fields", "patterns", "unit_aliases", "dimension", "canonical_unit",
 }
 
 
@@ -325,6 +365,32 @@ def _load_yaml(path: str) -> dict:
     return data
 
 
+def _load_v2_data(path: str, _seen: Tuple[str, ...] = ()) -> dict:
+    """version 2 のYAMLを読み込み、`include` (他のYAMLへの相対パスのリスト) を展開する。
+
+    取り込んだ semantic_types を先に置き、このファイル自身の定義が同名の
+    semantic_type を上書きする (共通の定義 `common_semantics.yaml` を
+    取り込んだうえで、研究室ごとに一部を差し替えられるようにするため)。
+    循環 include はエラー。"""
+    import os
+
+    real = os.path.realpath(path)
+    if real in _seen:
+        raise SemanticMappingError(f"{path}: include が循環しています")
+    data = _load_yaml(path)
+    includes = data.get("include") or []
+    if not isinstance(includes, list) or not all(isinstance(i, str) for i in includes):
+        raise SemanticMappingError(f"{path}: include は文字列のリストで指定してください")
+    merged: Dict[str, object] = {}
+    for inc in includes:
+        inc_data = _load_v2_data(os.path.join(os.path.dirname(path), inc), _seen + (real,))
+        merged.update(inc_data.get("semantic_types") or {})
+    merged.update(data.get("semantic_types") or {})
+    result = {k: v for k, v in data.items() if k != "include"}
+    result["semantic_types"] = merged
+    return result
+
+
 @dataclass(frozen=True)
 class LoadedMapping:
     """`load_mapping_file()` の戻り値。version に依らず CLI が同じ形で扱える。
@@ -359,7 +425,7 @@ def load_mapping_file(path: str) -> LoadedMapping:
     if version == 2:
         from .configured_text import ConfiguredTextRuleInterpreter
 
-        mapping = SemanticMapping.from_dict(data)
+        mapping = SemanticMapping.from_dict(_load_v2_data(path))
         return LoadedMapping(
             version=2,
             field_mapping=mapping.to_field_mapping(),

@@ -1,0 +1,49 @@
+# 分野に依存しない共通のSemantic Mapping (version 2)。
+#
+# 汎用の自由記述抽出 (TextRuleInterpreter) が出力する semantic_type に、role/target と
+# 標準単位 (dimension/canonical_unit) を与える。これが無いと「20 min」「@4℃」は
+# 抽出されても role/target が未確定のままになり、--confidence-threshold を下げても
+# 自動反映されない。
+#
+# dimension/canonical_unit を指定した値は、標準単位へ換算される
+# (例: 11 h -> 660 min、300 s -> 5 min)。換算できない単位の値は、semantic_typeは
+# 保持したまま自動反映だけが見送られる。
+#
+# 質量 (mass)・体積 (volume) は、同じ値でも「試料の量 (material)」と「実験条件
+# (condition)」のどちらにもなり得て、本文だけでは役割を決められないため、ここでは
+# 定義していない。必要な研究室は、自分のYAMLで role を決めて定義すること。
+
+version: 2
+
+semantic_types:
+  duration:
+    role: condition
+    target: conditions
+    dimension: time
+    canonical_unit: min
+    data_type: number
+
+  temperature:
+    role: condition
+    target: conditions
+    dimension: temperature
+    canonical_unit: degC
+    data_type: number
+
+  # 「5 minx2」の x2 (直前の時間の繰り返し回数)
+  repeat_count:
+    role: condition
+    target: conditions
+    data_type: number
+
+  rotation_speed:
+    role: condition
+    target: conditions
+    dimension: rotation_speed
+    canonical_unit: rpm
+    data_type: number
+
+  ph:
+    role: condition
+    target: conditions
+    data_type: number

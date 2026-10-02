@@ -50,9 +50,18 @@ from .sections import (
     SectionMappingError,
     SectionDetector,
     SectionClassifier,
+    Statement,
+    StatementSplitter,
     html_to_structured_text,
     UNKNOWN_SECTION_TYPE,
 )
+from .operations import (
+    OperationInterpretation,
+    OperationInterpreter,
+    OperationMapping,
+    OperationMappingError,
+)
+from .units import normalize_quantity, dimension_of
 from .apply import apply_interpretation_report
 from .normalize import NormalizedValue, parse_numeric_with_unit, canonical_unit
 
@@ -101,6 +110,14 @@ __all__ = [
     "SectionClassifier",
     "html_to_structured_text",
     "UNKNOWN_SECTION_TYPE",
+    "Statement",
+    "StatementSplitter",
+    "OperationInterpretation",
+    "OperationInterpreter",
+    "OperationMapping",
+    "OperationMappingError",
+    "normalize_quantity",
+    "dimension_of",
     "apply_interpretation_report",
     "NormalizedValue",
     "parse_numeric_with_unit",
